@@ -23,20 +23,12 @@ struct SettingsView: View {
             if selectedMode == .automatic {
                 automaticShortcutsSection
                 automaticSection
+                behaviorSection
             } else {
                 manualSection
             }
 
-            Section("Behavior") {
-                Toggle("Launch at login", isOn: $model.startAtLogin)
-                Toggle("Show menu bar icon", isOn: menuBarIconBinding)
-
-                if let loginItemError = model.loginItemError {
-                    Text(loginItemError)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-            }
+            aboutSection
         }
         .formStyle(.grouped)
         .padding(20)
@@ -157,6 +149,29 @@ struct SettingsView: View {
             GridItem(.flexible(), alignment: .leading),
             GridItem(.flexible(), alignment: .leading)
         ]
+    }
+
+    private var behaviorSection: some View {
+        Section("Behavior") {
+            Toggle("Launch at login", isOn: $model.startAtLogin)
+            Toggle("Show menu bar icon", isOn: menuBarIconBinding)
+
+            if let loginItemError = model.loginItemError {
+                Text(loginItemError)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var aboutSection: some View {
+        let info = AboutInfo.current
+
+        return Section("About") {
+            LabeledContent("Version", value: info.version)
+            LabeledContent("Build", value: info.buildNumber)
+            LabeledContent("Creator", value: info.creator)
+        }
     }
 
     private var manualSection: some View {

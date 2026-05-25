@@ -23,7 +23,7 @@ struct SnapApp: App {
                 appDelegate.openSettings = { openSettings() }
             }
         } label: {
-            Image(systemName: "square.grid.3x3.fill")
+            menuBarIcon
         }
         .menuBarExtraStyle(.window)
         .commands {
@@ -42,8 +42,31 @@ struct SnapApp: App {
         }
     }
 
+    @ViewBuilder
+    private var menuBarIcon: some View {
+        if let image = NSImage(named: "SnapMenuBarIcon")?.templateCopy(pointSize: NSSize(width: 18, height: 18)) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .accessibilityLabel("Snap")
+        } else {
+            Image(systemName: "bolt.fill")
+                .accessibilityLabel("Snap")
+        }
+    }
+
     private func openSettings() {
         appDelegate.openSettings = { openSettings() }
         SettingsWindowPresenter.open(model: model, showMenuBarIcon: $showMenuBarIcon)
+    }
+}
+
+private extension NSImage {
+    func templateCopy(pointSize: NSSize) -> NSImage {
+        let copiedImage = copy() as? NSImage ?? self
+        copiedImage.size = pointSize
+        copiedImage.isTemplate = true
+        return copiedImage
     }
 }

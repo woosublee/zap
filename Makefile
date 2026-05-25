@@ -7,6 +7,7 @@ CONFIGURATION ?= debug
 CODESIGN_IDENTITY ?= -
 ICON_NAME ?= Snap
 ICON_FILE ?= Resources/$(ICON_NAME).icns
+MENU_BAR_ICON_FILE ?= Resources/SnapMenuBarIcon.png
 
 APP_BUNDLE := $(BUILD_DIR)/$(APP_NAME).app
 CONTENTS_DIR := $(APP_BUNDLE)/Contents
@@ -40,6 +41,9 @@ bundle: swift-build $(INFO_PLIST) $(ENTITLEMENTS)
 		ditto --norsrc --noextattr "$(ICON_FILE)" "$(RESOURCES_DIR)/$(ICON_NAME).icns"; \
 		plutil -replace CFBundleIconFile -string "$(ICON_NAME)" "$(CONTENTS_DIR)/Info.plist"; \
 	fi
+	@if [ -f "$(MENU_BAR_ICON_FILE)" ]; then \
+		ditto --norsrc --noextattr "$(MENU_BAR_ICON_FILE)" "$(RESOURCES_DIR)/SnapMenuBarIcon.png"; \
+	fi
 	chmod +x "$(MACOS_DIR)/$(APP_NAME)"
 	xattr -r -c "$(APP_BUNDLE)"
 	@echo "Bundled $(APP_BUNDLE)"
@@ -51,6 +55,9 @@ sign: bundle
 verify: sign
 	codesign --verify --deep --strict --verbose=2 "$(APP_BUNDLE)"
 	plutil -extract CFBundleIdentifier raw "$(APP_BUNDLE)/Contents/Info.plist" | grep -Fx "$(BUNDLE_ID)" >/dev/null
+	plutil -extract CFBundleIconFile raw "$(APP_BUNDLE)/Contents/Info.plist" | grep -Fx "$(ICON_NAME)" >/dev/null
+	test -f "$(RESOURCES_DIR)/$(ICON_NAME).icns"
+	test -f "$(RESOURCES_DIR)/SnapMenuBarIcon.png"
 	@echo "verification passed"
 
 run: sign

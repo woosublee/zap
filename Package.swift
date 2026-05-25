@@ -27,6 +27,11 @@ let package = Package(
             name: "SnapCoreTests",
             dependencies: ["SnapCore"],
             path: "Tests/SnapCoreTests"
+        ),
+        .testTarget(
+            name: "SnapAppTests",
+            dependencies: ["SnapApp"],
+            path: "Tests/SnapAppTests"
         )
     ]
 )
