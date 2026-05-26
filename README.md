@@ -4,6 +4,13 @@ Zap is a native macOS utility for opening and switching to apps with global keyb
 
 It is built for people who keep their most-used apps in the Dock and want to reach them without moving their hands away from the keyboard. Zap can automatically map Dock apps to number shortcuts, and it also supports manually registered app shortcuts for anything that does not fit the Dock-based workflow.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/screenshots/settings-automatic.png" alt="Zap Settings in Automatic mode" width="45%">
+  <img src="assets/screenshots/settings-manual.png" alt="Zap Settings in Manual mode" width="45%">
+</p>
+
 ## What Zap does
 
 Zap gives you two ways to launch or focus apps.
