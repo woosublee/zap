@@ -1,5 +1,5 @@
 import XCTest
-@testable import SnapCore
+@testable import ZapCore
 
 final class NumberKeyTests: XCTestCase {
     func testDockIndexMapping() {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import SnapApp
+@testable import ZapApp
 
 final class AboutPresentationTests: XCTestCase {
     func testFormatsVersionBuildAndCreatorLink() {

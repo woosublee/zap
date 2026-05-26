@@ -1,10 +1,10 @@
 import AppKit
-import SnapCore
+import ZapCore
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
-    @ObservedObject var model: SnapAppModel
+    @ObservedObject var model: ZapAppModel
     @Binding var showMenuBarIcon: Bool
     @State private var selectedMode = SettingsMode.automatic
     @State private var recordingShortcut: ManualShortcut?

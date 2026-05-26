@@ -1,5 +1,5 @@
 import AppKit
-import SnapCore
+import ZapCore
 import SwiftUI
 
 struct RecordedShortcut {

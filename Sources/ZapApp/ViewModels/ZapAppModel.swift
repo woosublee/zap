@@ -1,9 +1,9 @@
 import AppKit
 import Foundation
-import SnapCore
+import ZapCore
 
 @MainActor
-final class SnapAppModel: ObservableObject {
+final class ZapAppModel: ObservableObject {
     @Published private(set) var dockItems: [DockItem] = []
     @Published private(set) var manualShortcuts: [ManualShortcut] {
         didSet {
@@ -202,7 +202,7 @@ final class SnapAppModel: ObservableObject {
 
     private func observeAppReopenRequests() {
         appReopenObserver = NotificationCenter.default.addObserver(
-            forName: .snapApplicationShouldOpenSettings,
+            forName: .zapApplicationShouldOpenSettings,
             object: nil,
             queue: .main
         ) { [weak self] _ in

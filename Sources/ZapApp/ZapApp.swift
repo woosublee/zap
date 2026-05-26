@@ -2,9 +2,9 @@ import AppKit
 import SwiftUI
 
 @main
-struct SnapApp: App {
-    @NSApplicationDelegateAdaptor(SnapApplicationDelegate.self) private var appDelegate
-    @StateObject private var model = SnapAppModel()
+struct ZapApp: App {
+    @NSApplicationDelegateAdaptor(ZapApplicationDelegate.self) private var appDelegate
+    @StateObject private var model = ZapAppModel()
     @AppStorage("show_menu_bar_icon") private var showMenuBarIcon = true
 
     init() {

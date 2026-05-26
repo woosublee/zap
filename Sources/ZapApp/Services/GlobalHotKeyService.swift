@@ -1,6 +1,6 @@
 import Carbon
 import Foundation
-import SnapCore
+import ZapCore
 
 final class GlobalHotKeyService {
     private static let finderHotKeys: [(keyCode: UInt32, id: UInt32)] = [

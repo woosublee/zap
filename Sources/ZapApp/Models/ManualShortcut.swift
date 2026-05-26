@@ -1,5 +1,5 @@
 import Foundation
-import SnapCore
+import ZapCore
 
 struct ManualShortcut: Identifiable, Codable, Equatable {
     let id: UUID
