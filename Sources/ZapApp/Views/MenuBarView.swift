@@ -1,8 +1,8 @@
-import SnapCore
+import ZapCore
 import SwiftUI
 
 struct MenuBarView: View {
-    @ObservedObject var model: SnapAppModel
+    @ObservedObject var model: ZapAppModel
     let openSettings: () -> Void
     let openAbout: () -> Void
     let quit: () -> Void

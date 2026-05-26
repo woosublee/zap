@@ -5,18 +5,18 @@ let package = Package(
     name: "Zap",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "Zap", targets: ["SnapApp"]),
-        .library(name: "SnapCore", targets: ["SnapCore"])
+        .executable(name: "Zap", targets: ["ZapApp"]),
+        .library(name: "ZapCore", targets: ["ZapCore"])
     ],
     targets: [
         .target(
-            name: "SnapCore",
-            path: "Sources/SnapCore"
+            name: "ZapCore",
+            path: "Sources/ZapCore"
         ),
         .executableTarget(
-            name: "SnapApp",
-            dependencies: ["SnapCore"],
-            path: "Sources/SnapApp",
+            name: "ZapApp",
+            dependencies: ["ZapCore"],
+            path: "Sources/ZapApp",
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("Carbon"),
@@ -24,14 +24,14 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "SnapCoreTests",
-            dependencies: ["SnapCore"],
-            path: "Tests/SnapCoreTests"
+            name: "ZapCoreTests",
+            dependencies: ["ZapCore"],
+            path: "Tests/ZapCoreTests"
         ),
         .testTarget(
-            name: "SnapAppTests",
-            dependencies: ["SnapApp"],
-            path: "Tests/SnapAppTests"
+            name: "ZapAppTests",
+            dependencies: ["ZapApp"],
+            path: "Tests/ZapAppTests"
         )
     ]
 )

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import XCTest
-@testable import SnapApp
+@testable import ZapApp
 
 final class AboutWindowPresenterTests: XCTestCase {
     @MainActor
