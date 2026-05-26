@@ -27,16 +27,7 @@ struct SettingsView: View {
                 manualSection
             }
 
-            Section("Behavior") {
-                Toggle("Launch at login", isOn: $model.startAtLogin)
-                Toggle("Show menu bar icon", isOn: menuBarIconBinding)
-
-                if let loginItemError = model.loginItemError {
-                    Text(loginItemError)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-            }
+            behaviorSection
         }
         .formStyle(.grouped)
         .padding(20)
@@ -157,6 +148,19 @@ struct SettingsView: View {
             GridItem(.flexible(), alignment: .leading),
             GridItem(.flexible(), alignment: .leading)
         ]
+    }
+
+    private var behaviorSection: some View {
+        Section("Behavior") {
+            Toggle("Launch at login", isOn: $model.startAtLogin)
+            Toggle("Show menu bar icon", isOn: menuBarIconBinding)
+
+            if let loginItemError = model.loginItemError {
+                Text(loginItemError)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
     }
 
     private var manualSection: some View {

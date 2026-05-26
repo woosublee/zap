@@ -17,13 +17,14 @@ struct SnapApp: App {
             MenuBarView(
                 model: model,
                 openSettings: { openSettings() },
+                openAbout: { openAbout() },
                 quit: { NSApp.terminate(nil) }
             )
             .onAppear {
                 appDelegate.openSettings = { openSettings() }
             }
         } label: {
-            Image(systemName: "square.grid.3x3.fill")
+            menuBarIcon
         }
         .menuBarExtraStyle(.window)
         .commands {
@@ -34,7 +35,7 @@ struct SnapApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
             CommandGroup(replacing: .appTermination) {
-                Button("Quit Snap") {
+                Button("Quit \(AboutPresentation.currentAppName)") {
                     NSApp.terminate(nil)
                 }
                 .keyboardShortcut("q", modifiers: .command)
@@ -42,8 +43,37 @@ struct SnapApp: App {
         }
     }
 
+    @ViewBuilder
+    private var menuBarIcon: some View {
+        if let image = NSImage(named: "ZapMenuBarIcon")?.templateCopy(pointSize: NSSize(width: 18, height: 18)) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .accessibilityLabel(AboutPresentation.currentAppName)
+        } else {
+            Image(systemName: "bolt.fill")
+                .accessibilityLabel(AboutPresentation.currentAppName)
+        }
+    }
+
     private func openSettings() {
         appDelegate.openSettings = { openSettings() }
         SettingsWindowPresenter.open(model: model, showMenuBarIcon: $showMenuBarIcon)
+    }
+
+    private func openAbout() {
+        AboutWindowPresenter.open()
+    }
+}
+
+private extension NSImage {
+    func templateCopy(pointSize: NSSize) -> NSImage {
+        guard let copiedImage = copy() as? NSImage else {
+            return self
+        }
+        copiedImage.size = pointSize
+        copiedImage.isTemplate = true
+        return copiedImage
     }
 }
