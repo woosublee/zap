@@ -48,9 +48,8 @@ bundle: swift-build $(INFO_PLIST) $(ENTITLEMENTS)
 		ditto --norsrc --noextattr "$(ICON_FILE)" "$(RESOURCES_DIR)/$(ICON_NAME).icns"; \
 		plutil -replace CFBundleIconFile -string "$(ICON_NAME)" "$(CONTENTS_DIR)/Info.plist"; \
 	fi
-	@if [ -f "$(MENU_BAR_ICON_FILE)" ]; then \
-		ditto --norsrc --noextattr "$(MENU_BAR_ICON_FILE)" "$(RESOURCES_DIR)/ZapMenuBarIcon.png"; \
-	fi
+	test -f "$(MENU_BAR_ICON_FILE)" || { echo "Missing menu bar icon: $(MENU_BAR_ICON_FILE)"; exit 1; }
+	ditto --norsrc --noextattr "$(MENU_BAR_ICON_FILE)" "$(RESOURCES_DIR)/ZapMenuBarIcon.png"
 	chmod +x "$(MACOS_DIR)/$(APP_NAME)"
 	xattr -r -c "$(APP_BUNDLE)"
 	@echo "Bundled $(APP_BUNDLE)"

@@ -69,7 +69,9 @@ struct SnapApp: App {
 
 private extension NSImage {
     func templateCopy(pointSize: NSSize) -> NSImage {
-        let copiedImage = copy() as? NSImage ?? self
+        guard let copiedImage = copy() as? NSImage else {
+            return self
+        }
         copiedImage.size = pointSize
         copiedImage.isTemplate = true
         return copiedImage

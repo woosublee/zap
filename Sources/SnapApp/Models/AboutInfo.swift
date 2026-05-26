@@ -11,18 +11,9 @@ struct AboutInfo: Equatable {
 
     static func make(infoDictionary: [String: Any]) -> AboutInfo {
         AboutInfo(
-            version: stringValue(for: "CFBundleShortVersionString", in: infoDictionary) ?? "Unknown",
-            buildNumber: stringValue(for: "CFBundleVersion", in: infoDictionary) ?? "Unknown",
+            version: infoDictionary.trimmedString(for: "CFBundleShortVersionString") ?? "Unknown",
+            buildNumber: infoDictionary.trimmedString(for: "CFBundleVersion") ?? "Unknown",
             creator: "Woosub Lee"
         )
-    }
-
-    private static func stringValue(for key: String, in infoDictionary: [String: Any]) -> String? {
-        guard let value = infoDictionary[key] as? String else {
-            return nil
-        }
-
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue.isEmpty ? nil : trimmedValue
     }
 }

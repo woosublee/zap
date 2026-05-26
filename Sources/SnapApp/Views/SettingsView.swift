@@ -23,10 +23,11 @@ struct SettingsView: View {
             if selectedMode == .automatic {
                 automaticShortcutsSection
                 automaticSection
-                behaviorSection
             } else {
                 manualSection
             }
+
+            behaviorSection
         }
         .formStyle(.grouped)
         .padding(20)
