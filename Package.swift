@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "Snap",
+    name: "Zap",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "Snap", targets: ["SnapApp"]),
+        .executable(name: "Zap", targets: ["SnapApp"]),
         .library(name: "SnapCore", targets: ["SnapCore"])
     ],
     targets: [

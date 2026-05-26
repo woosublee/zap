@@ -19,7 +19,7 @@ final class MenuBarIconResourceTests: XCTestCase {
 
     private func menuBarIconImage() throws -> CGImage {
         let iconURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("Resources/SnapMenuBarIcon.png")
+            .appendingPathComponent("Resources/ZapMenuBarIcon.png")
         let source = try XCTUnwrap(CGImageSourceCreateWithURL(iconURL as CFURL, nil))
         return try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
     }

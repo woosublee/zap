@@ -36,7 +36,7 @@ enum SettingsWindowPresenter {
             backing: .buffered,
             defer: false
         )
-        window.title = "Snap Settings"
+        window.title = "\(AboutPresentation.currentAppName) Settings"
         window.level = .floating
         window.collectionBehavior = [.moveToActiveSpace]
         window.contentViewController = NSHostingController(

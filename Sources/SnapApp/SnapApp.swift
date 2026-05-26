@@ -17,6 +17,7 @@ struct SnapApp: App {
             MenuBarView(
                 model: model,
                 openSettings: { openSettings() },
+                openAbout: { openAbout() },
                 quit: { NSApp.terminate(nil) }
             )
             .onAppear {
@@ -34,7 +35,7 @@ struct SnapApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
             CommandGroup(replacing: .appTermination) {
-                Button("Quit Snap") {
+                Button("Quit \(AboutPresentation.currentAppName)") {
                     NSApp.terminate(nil)
                 }
                 .keyboardShortcut("q", modifiers: .command)
@@ -44,21 +45,25 @@ struct SnapApp: App {
 
     @ViewBuilder
     private var menuBarIcon: some View {
-        if let image = NSImage(named: "SnapMenuBarIcon")?.templateCopy(pointSize: NSSize(width: 18, height: 18)) {
+        if let image = NSImage(named: "ZapMenuBarIcon")?.templateCopy(pointSize: NSSize(width: 18, height: 18)) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 18, height: 18)
-                .accessibilityLabel("Snap")
+                .accessibilityLabel(AboutPresentation.currentAppName)
         } else {
             Image(systemName: "bolt.fill")
-                .accessibilityLabel("Snap")
+                .accessibilityLabel(AboutPresentation.currentAppName)
         }
     }
 
     private func openSettings() {
         appDelegate.openSettings = { openSettings() }
         SettingsWindowPresenter.open(model: model, showMenuBarIcon: $showMenuBarIcon)
+    }
+
+    private func openAbout() {
+        AboutWindowPresenter.open()
     }
 }
 

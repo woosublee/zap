@@ -1,12 +1,12 @@
-# Snap
+# Zap
 
-Snap is a native macOS utility for opening and switching to apps with global keyboard shortcuts.
+Zap is a native macOS utility for opening and switching to apps with global keyboard shortcuts.
 
-It is built for people who keep their most-used apps in the Dock and want to reach them without moving their hands away from the keyboard. Snap can automatically map Dock apps to number shortcuts, and it also supports manually registered app shortcuts for anything that does not fit the Dock-based workflow.
+It is built for people who keep their most-used apps in the Dock and want to reach them without moving their hands away from the keyboard. Zap can automatically map Dock apps to number shortcuts, and it also supports manually registered app shortcuts for anything that does not fit the Dock-based workflow.
 
-## What Snap does
+## What Zap does
 
-Snap gives you two ways to launch or focus apps.
+Zap gives you two ways to launch or focus apps.
 
 ### Automatic mode
 
@@ -18,7 +18,7 @@ For example, if the Dock shortcut modifier is set to `⌥`:
 - `⌥2` opens or focuses the second pinned Dock app.
 - The mapping continues through `⌥9`.
 
-You can choose the modifier keys used with the number shortcuts from Settings. Snap supports `⌘`, `⌃`, `⌥`, and `⇧` combinations.
+You can choose the modifier keys used with the number shortcuts from Settings. Zap supports `⌘`, `⌃`, `⌥`, and `⇧` combinations.
 
 ### Manual mode
 
@@ -34,7 +34,7 @@ Manual shortcuts can be enabled, disabled, re-recorded, or removed at any time.
 
 ## Finder shortcut
 
-Snap includes an optional Finder shortcut.
+Zap includes an optional Finder shortcut.
 
 When enabled, `⌥` plus the physical `₩` / `` ` `` key opens Finder using behavior similar to clicking Finder in the Dock. The displayed key follows your current input source:
 
@@ -45,13 +45,13 @@ The shortcut is based on the physical key, so it continues to work across Korean
 
 ## Menu bar and Dock behavior
 
-By default, Snap runs as a menu bar app.
+By default, Zap runs as a menu bar app.
 
-If you hide the menu bar icon, Snap switches to a regular Dock app so Settings is still reachable. Clicking the Dock icon opens the Settings window.
+If you hide the menu bar icon, Zap switches to a regular Dock app so Settings is still reachable. Clicking the Dock icon opens the Settings window.
 
 ## Settings
 
-Snap has two main Settings modes.
+Zap has two main Settings modes.
 
 ### Automatic
 
@@ -71,11 +71,11 @@ Use Manual mode to:
 - enable or disable a shortcut;
 - remove shortcuts you no longer need.
 
-Automatic and Manual shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Snap shows a registration error.
+Automatic and Manual shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Zap shows a registration error.
 
 ## Privacy
 
-Snap runs locally on your Mac.
+Zap runs locally on your Mac.
 
 It does not use a server, does not collect analytics, and does not send your app list or shortcut settings anywhere. App and shortcut settings are stored locally with `UserDefaults`.
 
@@ -93,29 +93,36 @@ Run tests:
 swift test
 ```
 
-Build and run:
+Build and run the development app:
 
 ```sh
-make run
+make dev-run
 ```
 
-Build, sign, and verify:
+Build, sign, and verify the development app:
 
 ```sh
-make verify
+make dev-verify
 ```
 
-Install to `/Applications`:
+Build, sign, and verify the production app:
 
 ```sh
-make install
+make prod-verify
 ```
 
-The default app bundle is created at `build/Snap.app`.
+Install the production app to `/Applications`:
+
+```sh
+make prod-install
+```
+
+The development app bundle is created at `/tmp/zap-bundles/dev/Zap dev.app`.
+The production app bundle is created at `/tmp/zap-bundles/prod/Zap.app`.
 
 ## Notes
 
 - Dock shortcuts depend on the current pinned Dock app order.
 - Global shortcuts may conflict with shortcuts registered by macOS or other apps.
 - Manual shortcuts are local to the current macOS user account.
-- Snap is currently distributed as a locally built macOS app bundle.
+- Zap is currently distributed as a locally built macOS app bundle.

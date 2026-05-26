@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuBarView: View {
     @ObservedObject var model: SnapAppModel
     let openSettings: () -> Void
+    let openAbout: () -> Void
     let quit: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -39,10 +40,14 @@ struct MenuBarView: View {
                 dismiss()
                 openSettings()
             }
+            MenuRow(label: AboutPresentation.aboutMenuLabel(appName: AboutPresentation.currentAppName), systemImage: "info.circle") {
+                dismiss()
+                openAbout()
+            }
 
             separator
 
-            MenuRow(label: "Quit Snap", systemImage: nil, shortcut: "⌘Q") {
+            MenuRow(label: "Quit \(AboutPresentation.currentAppName)", systemImage: nil, shortcut: "⌘Q") {
                 quit()
             }
         }
@@ -52,7 +57,7 @@ struct MenuBarView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Snap")
+            Text(AboutPresentation.currentAppName)
                 .font(.system(size: 13, weight: .semibold))
             Text("Launch Dock apps with number shortcuts")
                 .font(.system(size: 11.5))

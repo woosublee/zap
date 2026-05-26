@@ -27,8 +27,6 @@ struct SettingsView: View {
             } else {
                 manualSection
             }
-
-            aboutSection
         }
         .formStyle(.grouped)
         .padding(20)
@@ -161,16 +159,6 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
-        }
-    }
-
-    private var aboutSection: some View {
-        let info = AboutInfo.current
-
-        return Section("About") {
-            LabeledContent("Version", value: info.version)
-            LabeledContent("Build", value: info.buildNumber)
-            LabeledContent("Creator", value: info.creator)
         }
     }
 
