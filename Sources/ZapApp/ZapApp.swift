@@ -20,9 +20,6 @@ struct ZapApp: App {
                 openAbout: { openAbout() },
                 quit: { NSApp.terminate(nil) }
             )
-            .onAppear {
-                appDelegate.openSettings = { openSettings() }
-            }
         } label: {
             menuBarIcon
         }
@@ -58,7 +55,6 @@ struct ZapApp: App {
     }
 
     private func openSettings() {
-        appDelegate.openSettings = { openSettings() }
         SettingsWindowPresenter.open(model: model, showMenuBarIcon: $showMenuBarIcon)
     }
 

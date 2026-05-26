@@ -5,11 +5,8 @@ extension Notification.Name {
 }
 
 final class ZapApplicationDelegate: NSObject, NSApplicationDelegate {
-    var openSettings: (() -> Void)?
-
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         NotificationCenter.default.post(name: .zapApplicationShouldOpenSettings, object: nil)
-        openSettings?()
         return false
     }
 }
