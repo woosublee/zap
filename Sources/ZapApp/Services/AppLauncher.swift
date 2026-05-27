@@ -25,7 +25,7 @@ struct AppLauncher: AppLaunching {
     func activateFinder() {
         let bundleIdentifier = "com.apple.finder"
         if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first {
-            runningApp.activate(options: [.activateIgnoringOtherApps])
+            runningApp.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
             sendReopenEvent(to: runningApp)
             return
         }
