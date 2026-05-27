@@ -6,45 +6,72 @@ protocol AppLaunching {
 }
 
 struct AppLauncher: AppLaunching {
+    private let runningApplication: (String) -> NSRunningApplication?
+    private let activateRunningApplication: (NSRunningApplication, NSApplication.ActivationOptions) -> Void
+    private let applicationURL: (String) -> URL?
+    private let openApplication: (URL, NSWorkspace.OpenConfiguration, @escaping (NSRunningApplication?, Error?) -> Void) -> Void
+    private let beep: () -> Void
+    private let sendReopenEventHandler: (NSRunningApplication) -> Void
+
+    init(
+        runningApplication: @escaping (String) -> NSRunningApplication? = { NSRunningApplication.runningApplications(withBundleIdentifier: $0).first },
+        activateRunningApplication: @escaping (NSRunningApplication, NSApplication.ActivationOptions) -> Void = { app, options in
+            app.activate(options: options)
+        },
+        applicationURL: @escaping (String) -> URL? = { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) },
+        openApplication: @escaping (URL, NSWorkspace.OpenConfiguration, @escaping (NSRunningApplication?, Error?) -> Void) -> Void = { url, configuration, completion in
+            NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: completion)
+        },
+        beep: @escaping () -> Void = { NSSound.beep() },
+        sendReopenEvent: ((NSRunningApplication) -> Void)? = nil
+    ) {
+        self.runningApplication = runningApplication
+        self.activateRunningApplication = activateRunningApplication
+        self.applicationURL = applicationURL
+        self.openApplication = openApplication
+        self.beep = beep
+        self.sendReopenEventHandler = sendReopenEvent ?? Self.sendReopenEvent(to:)
+    }
+
     func activateOrLaunch(_ item: DockItem) {
         if let bundleIdentifier = item.bundleIdentifier,
-           let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first {
-            runningApp.activate(options: [.activateIgnoringOtherApps])
+           let runningApp = runningApplication(bundleIdentifier) {
+            activateRunningApplication(runningApp, [.activateIgnoringOtherApps])
             return
         }
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        NSWorkspace.shared.openApplication(at: item.url, configuration: configuration) { _, error in
+        openApplication(item.url, configuration) { _, error in
             if error != nil {
-                NSSound.beep()
+                beep()
             }
         }
     }
 
     func activateFinder() {
         let bundleIdentifier = "com.apple.finder"
-        if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).first {
-            runningApp.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
-            sendReopenEvent(to: runningApp)
+        if let runningApp = runningApplication(bundleIdentifier) {
+            activateRunningApplication(runningApp, [.activateAllWindows, .activateIgnoringOtherApps])
+            sendReopenEventHandler(runningApp)
             return
         }
 
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
-            NSSound.beep()
+        guard let url = applicationURL(bundleIdentifier) else {
+            beep()
             return
         }
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in
+        openApplication(url, configuration) { _, error in
             if error != nil {
-                NSSound.beep()
+                beep()
             }
         }
     }
 
-    private func sendReopenEvent(to app: NSRunningApplication) {
+    private static func sendReopenEvent(to app: NSRunningApplication) {
         let target = NSAppleEventDescriptor(processIdentifier: app.processIdentifier)
         let event = NSAppleEventDescriptor.appleEvent(
             withEventClass: AEEventClass(kCoreEventClass),

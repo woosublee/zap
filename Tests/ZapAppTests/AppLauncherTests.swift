@@ -1,25 +1,40 @@
+import AppKit
 import XCTest
 @testable import ZapApp
 
 final class AppLauncherTests: XCTestCase {
-    func testFinderActivationRequestsAllFinderWindowsForward() throws {
-        let source = try appLauncherSource()
-        let activateFinderStart = try XCTUnwrap(source.range(of: "func activateFinder()"))
-        let sendReopenCall = try XCTUnwrap(source.range(of: "sendReopenEvent(to: runningApp)", range: activateFinderStart.lowerBound..<source.endIndex))
-        let runningFinderActivation = source[activateFinderStart.lowerBound..<sendReopenCall.upperBound]
+    func testFinderActivationRequestsAllFinderWindowsForward() {
+        var capturedBundleIdentifier: String?
+        var capturedActivationOptions: NSApplication.ActivationOptions?
+        var didSendReopenEvent = false
 
-        XCTAssertTrue(
-            runningFinderActivation.contains(".activateAllWindows"),
-            "Running Finder activation should bring all existing Finder windows forward."
+        let launcher = AppLauncher(
+            runningApplication: { bundleIdentifier in
+                capturedBundleIdentifier = bundleIdentifier
+                return NSRunningApplication.current
+            },
+            activateRunningApplication: { _, options in
+                capturedActivationOptions = options
+            },
+            applicationURL: { _ in
+                XCTFail("Running Finder should not resolve an application URL.")
+                return nil
+            },
+            openApplication: { _, _, _ in
+                XCTFail("Running Finder should not be opened again.")
+            },
+            beep: {
+                XCTFail("Running Finder activation should not beep.")
+            },
+            sendReopenEvent: { _ in
+                didSendReopenEvent = true
+            }
         )
-    }
 
-    private func appLauncherSource() throws -> String {
-        let packageRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let sourceURL = packageRoot.appendingPathComponent("Sources/ZapApp/Services/AppLauncher.swift")
-        return try String(contentsOf: sourceURL)
+        launcher.activateFinder()
+
+        XCTAssertEqual(capturedBundleIdentifier, "com.apple.finder")
+        XCTAssertTrue(capturedActivationOptions?.contains(.activateAllWindows) == true)
+        XCTAssertTrue(didSendReopenEvent)
     }
 }
