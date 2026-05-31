@@ -106,7 +106,17 @@ final class UpdateServiceTests: XCTestCase {
         XCTAssertTrue(driver.automaticallyChecksForUpdates)
     }
     func testSettingsWindowPresenterDoesNotCreateTemporaryUpdateService() throws {
-        let source = try String(contentsOfFile: "/Users/woosublee/Documents/dev/zap/.claude/worktrees/sparkle-auto-update/Sources/ZapApp/Services/SettingsWindowPresenter.swift")
+        let testFileURL = URL(fileURLWithPath: #filePath)
+        let packageRootURL = testFileURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let presenterURL = packageRootURL
+            .appendingPathComponent("Sources")
+            .appendingPathComponent("ZapApp")
+            .appendingPathComponent("Services")
+            .appendingPathComponent("SettingsWindowPresenter.swift")
+        let source = try String(contentsOf: presenterURL)
 
         XCTAssertFalse(source.contains("UpdateService()"))
         XCTAssertFalse(source.contains("static func open(model: ZapAppModel)"))

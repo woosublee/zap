@@ -8,6 +8,7 @@ BUILD_DIR ?= /tmp/zap-bundles/default
 CONFIGURATION ?= debug
 CODESIGN_IDENTITY ?= -
 RELEASE_CODESIGN_IDENTITY ?= Zap Local
+CODESIGN_OPTIONS ?=
 LOCAL_CERTIFICATE_IDENTITY ?= $(RELEASE_CODESIGN_IDENTITY)
 DIST_DIR ?= dist
 SPARKLE_TOOLS_DIR ?= .sparkle-tools
@@ -53,7 +54,10 @@ bundle: swift-build embed-sparkle $(INFO_PLIST) $(ENTITLEMENTS)
 	test -x "$$app_executable" || { echo "Missing executable: $$app_executable"; exit 1; }; \
 	rm -rf "$(MACOS_DIR)" "$(RESOURCES_DIR)" "$(CONTENTS_DIR)/Info.plist"; \
 	mkdir -p "$(MACOS_DIR)" "$(RESOURCES_DIR)" "$(FRAMEWORKS_DIR)"; \
-	ditto --norsrc --noextattr "$$app_executable" "$(MACOS_DIR)/$(APP_NAME)"
+	ditto --norsrc --noextattr "$$app_executable" "$(MACOS_DIR)/$(APP_NAME)"; \
+	if ! otool -l "$(MACOS_DIR)/$(APP_NAME)" | grep -A2 LC_RPATH | grep -F "@executable_path/../Frameworks" >/dev/null; then \
+		install_name_tool -add_rpath "@executable_path/../Frameworks" "$(MACOS_DIR)/$(APP_NAME)"; \
+	fi
 	cp "$(INFO_PLIST)" "$(CONTENTS_DIR)/Info.plist"
 	plutil -replace CFBundleName -string "$(APP_NAME)" "$(CONTENTS_DIR)/Info.plist"
 	plutil -replace CFBundleDisplayName -string "$(APP_NAME)" "$(CONTENTS_DIR)/Info.plist"
@@ -96,11 +100,11 @@ sign: bundle
 			"$(FRAMEWORKS_DIR)/Sparkle.framework/Autoupdate" \
 			"$(FRAMEWORKS_DIR)/Sparkle.framework/Updater.app"; do \
 			if [ -e "$$item" ]; then \
-				codesign --force --options runtime --sign "$(CODESIGN_IDENTITY)" "$$item"; \
+				codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$$item"; \
 			fi; \
 		done; \
-		codesign --force --options runtime --sign "$(CODESIGN_IDENTITY)" "$(FRAMEWORKS_DIR)/Sparkle.framework"; \
-		codesign --force --options runtime --sign "$(CODESIGN_IDENTITY)" --entitlements "$(ENTITLEMENTS)" "$(APP_BUNDLE)"; \
+		codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$(FRAMEWORKS_DIR)/Sparkle.framework"; \
+		codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" --entitlements "$(ENTITLEMENTS)" "$(APP_BUNDLE)"; \
 	else \
 		codesign --force --sign "-" --entitlements "$(ENTITLEMENTS)" "$(APP_BUNDLE)"; \
 	fi
@@ -115,6 +119,7 @@ verify: sign
 	test -f "$(RESOURCES_DIR)/ZapMenuBarIcon.png"
 	test -d "$(FRAMEWORKS_DIR)/Sparkle.framework"
 	codesign --verify --strict --verbose=2 "$(FRAMEWORKS_DIR)/Sparkle.framework"
+	otool -l "$(MACOS_DIR)/$(APP_NAME)" | grep -A2 LC_RPATH | grep -F "@executable_path/../Frameworks" >/dev/null
 	@echo "verification passed"
 
 create-local-certificate:
@@ -193,11 +198,7 @@ release-archive: prod-verify
 	@echo "Created $(RELEASE_ARCHIVE)"
 
 appcast: $(SPARKLE_TOOLS_STAMP) release-archive check-eddsa-key
-	@tmpdir="$$(mktemp -d)"; \
-	trap 'rm -rf "'"'"'$$tmpdir'"'"'"' EXIT; \
-	key_file="$$tmpdir/ed25519_key"; \
-	"$(SPARKLE_GENERATE_KEYS)" --account "$(SPARKLE_ACCOUNT)" -x "$$key_file"; \
-	"$(SPARKLE_GENERATE_APPCAST)" --ed-key-file "$$key_file" --download-url-prefix "$(DOWNLOAD_BASE_URL)" -o "$(DIST_DIR)/appcast.xml" "$(DIST_DIR)"
+	"$(SPARKLE_GENERATE_APPCAST)" --account "$(SPARKLE_ACCOUNT)" --download-url-prefix "$(DOWNLOAD_BASE_URL)" -o "$(DIST_DIR)/appcast.xml" "$(DIST_DIR)"
 	python3 -c 'exec("\n".join(["from pathlib import Path", "import re", "import sys", "from xml.sax.saxutils import escape, unescape", "path = Path(sys.argv[1])", "text = path.read_text()", "item_pattern = re.compile(r\"(<item\\b[^>]*>)(.*?)(</item>)\", re.DOTALL)", "version_pattern = re.compile(r\"\\s*<sparkle:version>(.*?)</sparkle:version>\", re.DOTALL)", "enclosure_without_version_pattern = re.compile(r\"<enclosure\\b(?![^>]*\\bsparkle:version=)\")", "", "def transform_item(match):", "    start, body, end = match.groups()", "    versions = version_pattern.findall(body)", "    if not versions:", "        return match.group(0)", "    version = escape(unescape(versions[0].strip()), dict([(\"\\\"\", \"&quot;\")]))", "    body = version_pattern.sub(\"\", body)", "    if \"sparkle:version=\" not in body:", "        body, count = enclosure_without_version_pattern.subn(f\"<enclosure sparkle:version=\\\"{version}\\\"\", body, count=1)", "        if count != 1:", "            raise SystemExit(\"Missing enclosure for sparkle:version\")", "    return f\"{start}{body}{end}\"", "", "text = item_pattern.sub(transform_item, text)", "path.write_text(text)"]))' "$(DIST_DIR)/appcast.xml"
 	@echo "Created $(DIST_DIR)/appcast.xml"
 
@@ -216,19 +217,19 @@ dev-run:
 	$(MAKE) run APP_NAME="$(DEV_APP_NAME)" BUNDLE_ID="$(DEV_BUNDLE_ID)" BUILD_DIR="$(DEV_BUILD_DIR)" CODESIGN_IDENTITY="-"
 
 prod-build:
-	$(MAKE) sign APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)"
+	$(MAKE) sign APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
 
 prod-verify:
-	$(MAKE) verify APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)"
+	$(MAKE) verify APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
 
 prod-run:
-	$(MAKE) run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)"
+	$(MAKE) run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
 
 prod-install:
-	$(MAKE) install APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)"
+	$(MAKE) install APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
 
 prod-install-and-run:
-	$(MAKE) install-and-run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)"
+	$(MAKE) install-and-run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
 
 run: sign
 	open "$(APP_BUNDLE)"
