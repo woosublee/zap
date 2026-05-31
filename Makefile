@@ -3,6 +3,7 @@ APP_NAME ?= Zap
 BUNDLE_ID ?= com.woosublee.zap
 VERSION ?= 0.1.1
 BUILD_NUMBER ?= 2
+BUILD_TAG ?= local-unknown
 BUILD_DIR ?= /tmp/zap-bundles/default
 CONFIGURATION ?= debug
 CODESIGN_IDENTITY ?= -
@@ -44,6 +45,7 @@ bundle: swift-build $(INFO_PLIST) $(ENTITLEMENTS)
 	plutil -replace CFBundleIdentifier -string "$(BUNDLE_ID)" "$(CONTENTS_DIR)/Info.plist"
 	plutil -replace CFBundleShortVersionString -string "$(VERSION)" "$(CONTENTS_DIR)/Info.plist"
 	plutil -replace CFBundleVersion -string "$(BUILD_NUMBER)" "$(CONTENTS_DIR)/Info.plist"
+	plutil -replace ZapBuildTag -string "$(BUILD_TAG)" "$(CONTENTS_DIR)/Info.plist"
 	@if [ -f "$(ICON_FILE)" ]; then \
 		ditto --norsrc --noextattr "$(ICON_FILE)" "$(RESOURCES_DIR)/$(ICON_NAME).icns"; \
 		plutil -replace CFBundleIconFile -string "$(ICON_NAME)" "$(CONTENTS_DIR)/Info.plist"; \
