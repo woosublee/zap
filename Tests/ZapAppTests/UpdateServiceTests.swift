@@ -72,6 +72,30 @@ final class UpdateServiceTests: XCTestCase {
         XCTAssertEqual(driver.checkForUpdatesCallCount, 1)
     }
 
+    func testManualCheckDisablesAutomaticChecksBeforeStartingLocalBuilds() {
+        let driver = FakeUpdateDriver()
+        let service = UpdateService(
+            driverFactory: { driver },
+            buildTagProvider: { "local-abc123" }
+        )
+
+        service.checkForUpdates()
+
+        XCTAssertEqual(driver.automaticallyChecksForUpdatesValuesSetBeforeStart, [false])
+    }
+
+    func testManualCheckKeepsAutomaticChecksEnabledBeforeStartingReleaseBuilds() {
+        let driver = FakeUpdateDriver()
+        let service = UpdateService(
+            driverFactory: { driver },
+            buildTagProvider: { "v0.1.2" }
+        )
+
+        service.checkForUpdates()
+
+        XCTAssertEqual(driver.automaticallyChecksForUpdatesValuesSetBeforeStart, [])
+    }
+
     func testAppLaunchSchedulesAutomaticUpdateStart() async {
         let driver = FakeUpdateDriver()
         let service = UpdateService(
@@ -131,10 +155,17 @@ final class UpdateServiceTests: XCTestCase {
 
 @MainActor
 private final class FakeUpdateDriver: UpdateDriving {
-    var automaticallyChecksForUpdates = true
+    var automaticallyChecksForUpdates = true {
+        didSet {
+            if startCallCount == 0 {
+                automaticallyChecksForUpdatesValuesSetBeforeStart.append(automaticallyChecksForUpdates)
+            }
+        }
+    }
     var canCheckForUpdates = true
     private(set) var startCallCount = 0
     private(set) var checkForUpdatesCallCount = 0
+    private(set) var automaticallyChecksForUpdatesValuesSetBeforeStart: [Bool] = []
 
     func start() {
         startCallCount += 1

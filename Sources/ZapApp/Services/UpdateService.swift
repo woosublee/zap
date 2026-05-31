@@ -45,6 +45,10 @@ final class UpdateService: ObservableObject {
     }
 
     func checkForUpdates() {
+        if !Self.isReleaseBuildTagForAutomaticChecks(buildTagProvider()) {
+            driver.automaticallyChecksForUpdates = false
+        }
+
         startIfNeeded()
         driver.checkForUpdates()
     }

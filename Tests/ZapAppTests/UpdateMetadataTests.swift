@@ -67,12 +67,19 @@ final class UpdateMetadataTests: XCTestCase {
     }
 
     private func loadInfoPlist() throws -> [String: Any] {
-        let data = try Data(contentsOf: URL(fileURLWithPath: "Info.plist"))
+        let data = try Data(contentsOf: packageRootURL.appendingPathComponent("Info.plist"))
         let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
         return try XCTUnwrap(plist as? [String: Any])
     }
 
     private func loadMakefile() throws -> String {
-        try String(contentsOfFile: "Makefile", encoding: .utf8)
+        try String(contentsOf: packageRootURL.appendingPathComponent("Makefile"), encoding: .utf8)
+    }
+
+    private var packageRootURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }
