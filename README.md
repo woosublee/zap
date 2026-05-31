@@ -129,9 +129,11 @@ The production app bundle is created at `/tmp/zap-bundles/prod/Zap.app`.
 
 ## Sparkle updates and release flow
 
-Zap uses Sparkle 2.9.2 for automatic updates. Update archives referenced by the appcast are verified with Sparkle EdDSA signatures, while the local production/release build path uses a self-signed macOS code signing identity named `Zap Local`.
+Zap uses Sparkle 2.9.2 for automatic updates. Update archives referenced by the appcast are verified with Sparkle EdDSA signatures, while the local production/release build path uses a self-signed macOS code signing identity named `zap`.
 
-Development builds use ad-hoc signing by default with `CODESIGN_IDENTITY=-`. Release-oriented targets use `RELEASE_CODESIGN_IDENTITY ?= Zap Local`.
+Development builds use ad-hoc signing by default with `CODESIGN_IDENTITY=-`. Release-oriented targets use `RELEASE_CODESIGN_IDENTITY ?= zap`.
+
+Sparkle automatic checks are enabled, automatic installs are disabled, and Zap does not set `SUUpdateCheckInterval`. Sparkle therefore uses its default automatic check interval of once per day.
 
 ### One-time local setup
 
@@ -147,11 +149,11 @@ Generate the Sparkle EdDSA key in Keychain:
 make generate-eddsa-key
 ```
 
-Because of Sparkle's official tool behavior, the private key is stored in Keychain with:
+Because of Sparkle's official tool behavior, the private key is stored in Keychain using Sparkle's fixed label and service. Zap only customizes the Sparkle account name:
 
+- label: `Private key for signing Sparkle updates`
 - service: `https://sparkle-project.org`
 - account: `com.woosublee.Zap.sparkle.ed25519`
-- label: `Private key for signing Sparkle updates`
 
 The Sparkle EdDSA private key is not stored in this repository.
 
