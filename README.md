@@ -188,15 +188,15 @@ https://woosublee.github.io/zap/appcast.xml
 Generate the Sparkle archive and appcast for a tagged release:
 
 ```sh
-make appcast VERSION=0.1.1 BUILD_NUMBER=2 BUILD_TAG=v0.1.1
+make appcast VERSION=0.1.2 BUILD_NUMBER=3 BUILD_TAG=v0.1.2
 ```
 
 This creates ignored release artifacts:
 
-- `dist/Zap-0.1.1.zip`
+- `dist/Zap-0.1.2.zip`
 - `dist/appcast.xml`
 
-Upload `dist/Zap-0.1.1.zip` to the GitHub Release matching `v0.1.1`, then publish `dist/appcast.xml` to the `SUFeedURL` location so Sparkle can discover the update.
+Upload `dist/Zap-0.1.2.zip` to the GitHub Release matching `v0.1.2`, then publish `dist/appcast.xml` to the `SUFeedURL` location so Sparkle can discover the update.
 
 ## Notes
 
