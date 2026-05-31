@@ -127,6 +127,77 @@ make prod-install
 The development app bundle is created at `/tmp/zap-bundles/dev/Zap dev.app`.
 The production app bundle is created at `/tmp/zap-bundles/prod/Zap.app`.
 
+## Sparkle updates and release flow
+
+Zap uses Sparkle 2.9.2 for automatic updates. Update archives referenced by the appcast are verified with Sparkle EdDSA signatures, while local app builds use a self-signed macOS code signing identity named `zap`.
+
+Development and production builds use `CODESIGN_IDENTITY ?= zap` by default. Release-oriented targets inherit this through `RELEASE_CODESIGN_IDENTITY ?= $(CODESIGN_IDENTITY)`.
+
+Sparkle automatic checks are enabled, automatic installs are disabled, and Zap does not set `SUUpdateCheckInterval`. Sparkle therefore uses its default automatic check interval of once per day.
+
+### One-time local setup
+
+Create the local self-signed signing certificate:
+
+```sh
+make create-local-certificate
+```
+
+Generate the Sparkle EdDSA key in Keychain:
+
+```sh
+make generate-eddsa-key
+```
+
+Because of Sparkle's official tool behavior, the private key is stored in Keychain using Sparkle's fixed label and service. Zap only customizes the Sparkle account name:
+
+- label: `Private key for signing Sparkle updates`
+- service: `https://sparkle-project.org`
+- account: `com.woosublee.Zap.sparkle.ed25519`
+
+The Sparkle EdDSA private key is not stored in this repository.
+
+### Verification
+
+Check that the local signing certificate exists:
+
+```sh
+make check-local-certificate
+```
+
+Check that the Sparkle EdDSA private key exists in Keychain and matches the `SUPublicEDKey` committed in `Info.plist`:
+
+```sh
+make check-eddsa-key
+```
+
+The matching public key is configured in the app's `Info.plist` as `SUPublicEDKey`:
+
+```text
+AHxDbDyUOqSlujzhZxsiHr89OwuBOgBiacMlFdCHTHs=
+```
+
+`SUFeedURL` points to:
+
+```text
+https://woosublee.github.io/zap/appcast.xml
+```
+
+### Generate release archive and appcast
+
+Generate the Sparkle archive and appcast for a tagged release:
+
+```sh
+make appcast VERSION=0.1.1 BUILD_NUMBER=2 BUILD_TAG=v0.1.1
+```
+
+This creates ignored release artifacts:
+
+- `dist/Zap-0.1.1.zip`
+- `dist/appcast.xml`
+
+Upload `dist/Zap-0.1.1.zip` to the GitHub Release matching `v0.1.1`, then publish `dist/appcast.xml` to the `SUFeedURL` location so Sparkle can discover the update.
+
 ## Notes
 
 - Dock shortcuts depend on the current pinned Dock app order.

@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var model: ZapAppModel
+    @ObservedObject var updateService: UpdateService
     @Binding var showMenuBarIcon: Bool
     @State private var selectedMode = SettingsMode.automatic
     @State private var recordingShortcut: ManualShortcut?
@@ -28,6 +29,7 @@ struct SettingsView: View {
             }
 
             behaviorSection
+            updatesSection
         }
         .formStyle(.grouped)
         .padding(20)
@@ -160,6 +162,20 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+        }
+    }
+
+    private var updatesSection: some View {
+        Section("Updates") {
+            Toggle("Automatically check for updates", isOn: $updateService.automaticallyChecksForUpdates)
+
+            Button("Check for Updates Now") {
+                updateService.checkForUpdates()
+            }
+
+            Text("Updates are delivered with Sparkle and verified using EdDSA signatures.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

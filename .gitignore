@@ -1,4 +1,7 @@
 .build/
+.swiftpm/
+dist/
+.sparkle-tools/
 build/
 DerivedData/
 *.xcuserstate

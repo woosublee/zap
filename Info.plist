@@ -22,6 +22,16 @@
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>SUFeedURL</key>
+    <string>https://woosublee.github.io/zap/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>AHxDbDyUOqSlujzhZxsiHr89OwuBOgBiacMlFdCHTHs=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>ZapBuildTag</key>
+    <string>local-unknown</string>
     <key>NSHumanReadableCopyright</key>
     <string>© 2026 Woosub Lee</string>
 </dict>

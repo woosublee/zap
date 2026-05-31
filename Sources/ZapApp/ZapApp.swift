@@ -4,18 +4,25 @@ import SwiftUI
 @main
 struct ZapApp: App {
     @NSApplicationDelegateAdaptor(ZapApplicationDelegate.self) private var appDelegate
-    @StateObject private var model = ZapAppModel()
+    @StateObject private var model: ZapAppModel
+    @StateObject private var updateService: UpdateService
     @AppStorage("show_menu_bar_icon") private var showMenuBarIcon = true
 
     init() {
         let savedValue = UserDefaults.standard.object(forKey: "show_menu_bar_icon") as? Bool ?? true
         AppActivationPolicy.apply(showMenuBarIcon: savedValue)
+
+        let updateService = UpdateService()
+        _updateService = StateObject(wrappedValue: updateService)
+        _model = StateObject(wrappedValue: ZapAppModel(updateService: updateService))
+        Self.startUpdateServiceOnAppLaunch(updateService)
     }
 
     var body: some Scene {
         MenuBarExtra(isInserted: $showMenuBarIcon) {
             MenuBarView(
                 model: model,
+                updateService: updateService,
                 openSettings: { openSettings() },
                 openAbout: { openAbout() },
                 quit: { NSApp.terminate(nil) }
@@ -30,6 +37,10 @@ struct ZapApp: App {
                     openSettings()
                 }
                 .keyboardShortcut(",", modifiers: .command)
+
+                Button("Check for Updates...") {
+                    updateService.checkForUpdates()
+                }
             }
             CommandGroup(replacing: .appTermination) {
                 Button("Quit \(AboutPresentation.currentAppName)") {
@@ -55,11 +66,21 @@ struct ZapApp: App {
     }
 
     private func openSettings() {
-        SettingsWindowPresenter.open(model: model, showMenuBarIcon: $showMenuBarIcon)
+        SettingsWindowPresenter.open(
+            model: model,
+            updateService: updateService,
+            showMenuBarIcon: $showMenuBarIcon
+        )
     }
 
     private func openAbout() {
         AboutWindowPresenter.open()
+    }
+
+    static func startUpdateServiceOnAppLaunch(_ updateService: UpdateService) {
+        Task { @MainActor in
+            updateService.start()
+        }
     }
 }
 

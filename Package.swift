@@ -8,6 +8,9 @@ let package = Package(
         .executable(name: "Zap", targets: ["ZapApp"]),
         .library(name: "ZapCore", targets: ["ZapCore"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.2")
+    ],
     targets: [
         .target(
             name: "ZapCore",
@@ -15,7 +18,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "ZapApp",
-            dependencies: ["ZapCore"],
+            dependencies: [
+                "ZapCore",
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/ZapApp",
             linkerSettings: [
                 .linkedFramework("AppKit"),
