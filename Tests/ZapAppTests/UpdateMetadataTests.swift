@@ -6,7 +6,7 @@ final class UpdateMetadataTests: XCTestCase {
         let plist = try loadInfoPlist()
 
         XCTAssertEqual(plist["SUFeedURL"] as? String, "https://woosublee.github.io/zap/appcast.xml")
-        XCTAssertEqual(plist["SUPublicEDKey"] as? String, "__ZAP_SPARKLE_PUBLIC_ED_KEY__")
+        XCTAssertEqual(plist["SUPublicEDKey"] as? String, "AHxDbDyUOqSlujzhZxsiHr89OwuBOgBiacMlFdCHTHs=")
         XCTAssertEqual(plist["SUEnableAutomaticChecks"] as? Bool, true)
         XCTAssertEqual(plist["SUAutomaticallyUpdate"] as? Bool, false)
         XCTAssertEqual(plist["ZapBuildTag"] as? String, "local-unknown")
