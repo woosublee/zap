@@ -1,8 +1,8 @@
 PRODUCT_NAME ?= Zap
 APP_NAME ?= Zap
 BUNDLE_ID ?= com.woosublee.zap
-VERSION ?= 0.1.2
-BUILD_NUMBER ?= 3
+VERSION ?= 0.1.3
+BUILD_NUMBER ?= 4
 BUILD_TAG ?= local-unknown
 BUILD_DIR ?= /tmp/zap-bundles/default
 CONFIGURATION ?= debug
@@ -20,7 +20,6 @@ SPARKLE_GENERATE_KEYS := $(SPARKLE_TOOLS_ROOT)/bin/generate_keys
 SPARKLE_GENERATE_APPCAST := $(SPARKLE_TOOLS_ROOT)/bin/generate_appcast
 SPARKLE_SIGN_UPDATE := $(SPARKLE_TOOLS_ROOT)/bin/sign_update
 SPARKLE_ACCOUNT ?= com.woosublee.Zap.sparkle.ed25519
-APPCAST_BASE_URL ?= https://woosublee.github.io/zap
 DOWNLOAD_BASE_URL ?= https://github.com/woosublee/zap/releases/download/v$(VERSION)/
 ICON_NAME ?= Zap
 ICON_FILE ?= Resources/$(ICON_NAME).icns
@@ -40,8 +39,9 @@ FRAMEWORKS_DIR := $(CONTENTS_DIR)/Frameworks
 INFO_PLIST := Info.plist
 ENTITLEMENTS := Zap.entitlements
 RELEASE_ARCHIVE := $(DIST_DIR)/$(APP_NAME)-$(VERSION).zip
+RELEASE_DMG := $(DIST_DIR)/$(APP_NAME)-$(VERSION).dmg
 
-.PHONY: all swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive appcast release
+.PHONY: all swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive release-dmg appcast release
 
 all: sign
 
@@ -205,15 +205,28 @@ release-archive: require-release-build-tag prod-verify
 	ditto -c -k --keepParent "$(PROD_BUILD_DIR)/$(PROD_APP_NAME).app" "$(RELEASE_ARCHIVE)"
 	@echo "Created $(RELEASE_ARCHIVE)"
 
-appcast: $(SPARKLE_TOOLS_STAMP) release-archive check-eddsa-key
-	"$(SPARKLE_GENERATE_APPCAST)" --account "$(SPARKLE_ACCOUNT)" --download-url-prefix "$(DOWNLOAD_BASE_URL)" -o "$(DIST_DIR)/appcast.xml" "$(DIST_DIR)"
+release-dmg: release-archive
+	mkdir -p "$(DIST_DIR)"
+	rm -f "$(RELEASE_DMG)"
+	hdiutil create -volname "$(APP_NAME) $(VERSION)" -srcfolder "$(PROD_BUILD_DIR)/$(PROD_APP_NAME).app" -ov -format UDZO "$(RELEASE_DMG)"
+	hdiutil verify "$(RELEASE_DMG)"
+	@echo "Created $(RELEASE_DMG)"
+
+appcast: $(SPARKLE_TOOLS_STAMP) release-dmg check-eddsa-key
+	@tmpdir="$(DIST_DIR)/appcast-input"; \
+	rm -rf "$$tmpdir"; \
+	mkdir -p "$$tmpdir"; \
+	cp "$(RELEASE_ARCHIVE)" "$$tmpdir/"; \
+	"$(SPARKLE_GENERATE_APPCAST)" --account "$(SPARKLE_ACCOUNT)" --download-url-prefix "$(DOWNLOAD_BASE_URL)" -o "$(DIST_DIR)/appcast.xml" "$$tmpdir"; \
+	rm -rf "$$tmpdir"
 	python3 -c 'exec("\n".join(["from pathlib import Path", "import re", "import sys", "from xml.sax.saxutils import escape, unescape", "path = Path(sys.argv[1])", "text = path.read_text()", "item_pattern = re.compile(r\"(<item\\b[^>]*>)(.*?)(</item>)\", re.DOTALL)", "version_pattern = re.compile(r\"\\s*<sparkle:version>(.*?)</sparkle:version>\", re.DOTALL)", "enclosure_without_version_pattern = re.compile(r\"<enclosure\\b(?![^>]*\\bsparkle:version=)\")", "", "def transform_item(match):", "    start, body, end = match.groups()", "    versions = version_pattern.findall(body)", "    if not versions:", "        return match.group(0)", "    version = escape(unescape(versions[0].strip()), dict([(\"\\\"\", \"&quot;\")]))", "    body = version_pattern.sub(\"\", body)", "    if \"sparkle:version=\" not in body:", "        body, count = enclosure_without_version_pattern.subn(f\"<enclosure sparkle:version=\\\"{version}\\\"\", body, count=1)", "        if count != 1:", "            raise SystemExit(\"Missing enclosure for sparkle:version\")", "    return f\"{start}{body}{end}\"", "", "text = item_pattern.sub(transform_item, text)", "path.write_text(text)"]))' "$(DIST_DIR)/appcast.xml"
 	@echo "Created $(DIST_DIR)/appcast.xml"
 
-release: create-local-certificate generate-eddsa-key appcast
+release: create-local-certificate generate-eddsa-key appcast release-dmg
 	@echo "Release archive: $(RELEASE_ARCHIVE)"
+	@echo "Release DMG: $(RELEASE_DMG)"
 	@echo "Appcast: $(DIST_DIR)/appcast.xml"
-	@echo "Appcast base URL: $(APPCAST_BASE_URL)"
+	@echo "Publish $(RELEASE_ARCHIVE), $(RELEASE_DMG), and $(DIST_DIR)/appcast.xml as GitHub Release assets."
 
 dev-build:
 	$(MAKE) sign APP_NAME="$(DEV_APP_NAME)" BUNDLE_ID="$(DEV_BUNDLE_ID)" BUILD_DIR="$(DEV_BUILD_DIR)"

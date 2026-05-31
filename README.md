@@ -177,10 +177,10 @@ The matching public key is configured in the app's `Info.plist` as `SUPublicEDKe
 AHxDbDyUOqSlujzhZxsiHr89OwuBOgBiacMlFdCHTHs=
 ```
 
-`SUFeedURL` points to:
+`SUFeedURL` points to the latest GitHub Release appcast asset:
 
 ```text
-https://woosublee.github.io/zap/appcast.xml
+https://github.com/woosublee/zap/releases/latest/download/appcast.xml
 ```
 
 ### Generate release archive and appcast
@@ -188,15 +188,16 @@ https://woosublee.github.io/zap/appcast.xml
 Generate the Sparkle archive and appcast for a tagged release:
 
 ```sh
-make appcast VERSION=0.1.2 BUILD_NUMBER=3 BUILD_TAG=v0.1.2
+make appcast VERSION=0.1.3 BUILD_NUMBER=4 BUILD_TAG=v0.1.3
 ```
 
 This creates ignored release artifacts:
 
-- `dist/Zap-0.1.2.zip`
+- `dist/Zap-0.1.3.zip`
+- `dist/Zap-0.1.3.dmg`
 - `dist/appcast.xml`
 
-Upload `dist/Zap-0.1.2.zip` to the GitHub Release matching `v0.1.2`, then publish `dist/appcast.xml` to the `SUFeedURL` location so Sparkle can discover the update.
+Upload all three files to the GitHub Release matching `v0.1.3`. Sparkle reads `appcast.xml` from the latest GitHub Release asset URL configured in `SUFeedURL`; no GitHub Pages publishing is required.
 
 ## Notes
 

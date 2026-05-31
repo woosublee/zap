@@ -5,7 +5,7 @@ final class UpdateMetadataTests: XCTestCase {
     func testInfoPlistDeclaresSparkleKeysAndBuildTag() throws {
         let plist = try loadInfoPlist()
 
-        XCTAssertEqual(plist["SUFeedURL"] as? String, "https://woosublee.github.io/zap/appcast.xml")
+        XCTAssertEqual(plist["SUFeedURL"] as? String, "https://github.com/woosublee/zap/releases/latest/download/appcast.xml")
         XCTAssertEqual(plist["SUPublicEDKey"] as? String, "AHxDbDyUOqSlujzhZxsiHr89OwuBOgBiacMlFdCHTHs=")
         XCTAssertEqual(plist["SUEnableAutomaticChecks"] as? Bool, true)
         XCTAssertEqual(plist["SUAutomaticallyUpdate"] as? Bool, false)
