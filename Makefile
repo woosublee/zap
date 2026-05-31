@@ -41,7 +41,7 @@ INFO_PLIST := Info.plist
 ENTITLEMENTS := Zap.entitlements
 RELEASE_ARCHIVE := $(DIST_DIR)/$(APP_NAME)-$(VERSION).zip
 
-.PHONY: all swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key release-archive appcast release
+.PHONY: all swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive appcast release
 
 all: sign
 
@@ -183,15 +183,26 @@ $(SPARKLE_TOOLS_STAMP):
 	touch "$(SPARKLE_TOOLS_STAMP)"
 
 check-eddsa-key: $(SPARKLE_TOOLS_STAMP)
-	"$(SPARKLE_GENERATE_KEYS)" --account "$(SPARKLE_ACCOUNT)" -p
+	@key="$$("$(SPARKLE_GENERATE_KEYS)" --account "$(SPARKLE_ACCOUNT)" -p)"; \
+	plist_key="$$(plutil -extract SUPublicEDKey raw "$(INFO_PLIST)")"; \
+	printf '%s\n' "$$key"; \
+	if [ "$$key" != "$$plist_key" ]; then \
+		echo "Sparkle EdDSA Keychain public key does not match $(INFO_PLIST) SUPublicEDKey"; \
+		exit 1; \
+	fi
 	security find-generic-password -s "https://sparkle-project.org" -a "$(SPARKLE_ACCOUNT)" >/dev/null
 
 generate-eddsa-key: $(SPARKLE_TOOLS_STAMP)
 	"$(SPARKLE_GENERATE_KEYS)" --account "$(SPARKLE_ACCOUNT)"
-	"$(SPARKLE_GENERATE_KEYS)" --account "$(SPARKLE_ACCOUNT)" -p
-	security find-generic-password -s "https://sparkle-project.org" -a "$(SPARKLE_ACCOUNT)" >/dev/null
+	$(MAKE) check-eddsa-key
 
-release-archive: prod-verify
+require-release-build-tag:
+	@test "$(BUILD_TAG)" = "v$(VERSION)" || { \
+		echo "Release builds require BUILD_TAG=v$(VERSION) (got $(BUILD_TAG))"; \
+		exit 1; \
+	}
+
+release-archive: require-release-build-tag prod-verify
 	rm -rf "$(DIST_DIR)"
 	mkdir -p "$(DIST_DIR)"
 	ditto -c -k --keepParent "$(PROD_BUILD_DIR)/$(PROD_APP_NAME).app" "$(RELEASE_ARCHIVE)"

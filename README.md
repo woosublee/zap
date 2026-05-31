@@ -129,7 +129,7 @@ The production app bundle is created at `/tmp/zap-bundles/prod/Zap.app`.
 
 ## Sparkle updates and release flow
 
-Zap uses Sparkle 2.9.2 for automatic updates. Update archives and the appcast are verified with Sparkle EdDSA signatures, while the local production/release build path uses a self-signed macOS code signing identity named `Zap Local`.
+Zap uses Sparkle 2.9.2 for automatic updates. Update archives referenced by the appcast are verified with Sparkle EdDSA signatures, while the local production/release build path uses a self-signed macOS code signing identity named `Zap Local`.
 
 Development builds use ad-hoc signing by default with `CODESIGN_IDENTITY=-`. Release-oriented targets use `RELEASE_CODESIGN_IDENTITY ?= Zap Local`.
 
@@ -163,7 +163,7 @@ Check that the local signing certificate exists:
 make check-local-certificate
 ```
 
-Check that the Sparkle EdDSA private key exists in Keychain:
+Check that the Sparkle EdDSA private key exists in Keychain and matches the `SUPublicEDKey` committed in `Info.plist`:
 
 ```sh
 make check-eddsa-key
