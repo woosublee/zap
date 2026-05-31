@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var model: ZapAppModel
+    @ObservedObject var updateService: UpdateService
     let openSettings: () -> Void
     let openAbout: () -> Void
     let quit: () -> Void
@@ -39,6 +40,10 @@ struct MenuBarView: View {
             MenuRow(label: "Settings...", systemImage: "gearshape", shortcut: "⌘,") {
                 dismiss()
                 openSettings()
+            }
+            MenuRow(label: "Check for Updates...", systemImage: "arrow.triangle.2.circlepath") {
+                dismiss()
+                updateService.checkForUpdates()
             }
             MenuRow(label: AboutPresentation.aboutMenuLabel(appName: AboutPresentation.currentAppName), systemImage: "info.circle") {
                 dismiss()

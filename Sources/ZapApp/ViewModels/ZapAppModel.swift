@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import ZapCore
 
 @MainActor
@@ -42,6 +43,7 @@ final class ZapAppModel: ObservableObject {
     private let dockItemProvider: any DockItemProviding
     private let appLauncher: any AppLaunching
     private let loginItemService: any LoginItemControlling
+    private let updateService: UpdateService
     private lazy var hotKeyService = GlobalHotKeyService(
         onDockHotKey: { [weak self] key in
             Task { @MainActor [weak self] in
@@ -63,11 +65,13 @@ final class ZapAppModel: ObservableObject {
     init(
         dockItemProvider: any DockItemProviding = DockItemProvider(),
         appLauncher: any AppLaunching = AppLauncher(),
-        loginItemService: any LoginItemControlling = LoginItemService()
+        loginItemService: any LoginItemControlling = LoginItemService(),
+        updateService: UpdateService
     ) {
         self.dockItemProvider = dockItemProvider
         self.appLauncher = appLauncher
         self.loginItemService = loginItemService
+        self.updateService = updateService
         self.manualShortcuts = Self.loadManualShortcuts()
         self.isFinderShortcutEnabled = UserDefaults.standard.bool(forKey: Self.finderShortcutEnabledKey)
         self.selectedModifiers = Self.loadModifiers()
@@ -208,7 +212,17 @@ final class ZapAppModel: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                SettingsWindowPresenter.open(model: self)
+                SettingsWindowPresenter.open(
+                    model: self,
+                    updateService: updateService,
+                    showMenuBarIcon: Binding(
+                        get: { UserDefaults.standard.object(forKey: "show_menu_bar_icon") as? Bool ?? true },
+                        set: { newValue in
+                            UserDefaults.standard.set(newValue, forKey: "show_menu_bar_icon")
+                            AppActivationPolicy.apply(showMenuBarIcon: newValue)
+                        }
+                    )
+                )
             }
         }
     }

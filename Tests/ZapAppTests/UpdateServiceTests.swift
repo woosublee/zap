@@ -67,6 +67,19 @@ final class UpdateServiceTests: XCTestCase {
         XCTAssertEqual(driver.checkForUpdatesCallCount, 1)
     }
 
+    func testAppLaunchSchedulesAutomaticUpdateStart() async {
+        let driver = FakeUpdateDriver()
+        let service = UpdateService(
+            driverFactory: { driver },
+            buildTagProvider: { "v0.1.2" }
+        )
+
+        ZapApp.startUpdateServiceOnAppLaunch(service)
+        await Task.yield()
+
+        XCTAssertEqual(driver.startCallCount, 1)
+    }
+
     func testCanCheckForUpdatesReadsDriver() {
         let driver = FakeUpdateDriver()
         driver.canCheckForUpdates = false
@@ -92,6 +105,13 @@ final class UpdateServiceTests: XCTestCase {
 
         XCTAssertTrue(driver.automaticallyChecksForUpdates)
     }
+    func testSettingsWindowPresenterDoesNotCreateTemporaryUpdateService() throws {
+        let source = try String(contentsOfFile: "/Users/woosublee/Documents/dev/zap/.claude/worktrees/sparkle-auto-update/Sources/ZapApp/Services/SettingsWindowPresenter.swift")
+
+        XCTAssertFalse(source.contains("UpdateService()"))
+        XCTAssertFalse(source.contains("static func open(model: ZapAppModel)"))
+    }
+
 }
 
 @MainActor
