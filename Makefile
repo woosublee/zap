@@ -17,9 +17,10 @@ SPARKLE_TOOLS_ROOT := $(SPARKLE_TOOLS_DIR)/Sparkle-$(SPARKLE_VERSION)
 SPARKLE_TOOLS_STAMP := $(SPARKLE_TOOLS_ROOT)/.ready
 SPARKLE_GENERATE_KEYS := $(SPARKLE_TOOLS_ROOT)/bin/generate_keys
 SPARKLE_GENERATE_APPCAST := $(SPARKLE_TOOLS_ROOT)/bin/generate_appcast
+SPARKLE_SIGN_UPDATE := $(SPARKLE_TOOLS_ROOT)/bin/sign_update
 SPARKLE_ACCOUNT ?= com.woosublee.Zap.sparkle.ed25519
 APPCAST_BASE_URL ?= https://woosublee.github.io/zap
-DOWNLOAD_BASE_URL ?= https://github.com/woosublee/zap/releases/download/v$(VERSION)
+DOWNLOAD_BASE_URL ?= https://github.com/woosublee/zap/releases/download/v$(VERSION)/
 ICON_NAME ?= Zap
 ICON_FILE ?= Resources/$(ICON_NAME).icns
 MENU_BAR_ICON_FILE ?= Resources/ZapMenuBarIcon.png
@@ -173,6 +174,7 @@ $(SPARKLE_TOOLS_STAMP):
 	tar -xJf "$(SPARKLE_TOOLS_ARCHIVE)" -C "$(SPARKLE_TOOLS_ROOT)" --strip-components 1
 	test -x "$(SPARKLE_GENERATE_KEYS)"
 	test -x "$(SPARKLE_GENERATE_APPCAST)"
+	test -x "$(SPARKLE_SIGN_UPDATE)"
 	touch "$(SPARKLE_TOOLS_STAMP)"
 
 check-eddsa-key: $(SPARKLE_TOOLS_STAMP)
@@ -185,13 +187,18 @@ generate-eddsa-key: $(SPARKLE_TOOLS_STAMP)
 	security find-generic-password -s "https://sparkle-project.org" -a "$(SPARKLE_ACCOUNT)" >/dev/null
 
 release-archive: prod-verify
+	rm -rf "$(DIST_DIR)"
 	mkdir -p "$(DIST_DIR)"
-	rm -f "$(RELEASE_ARCHIVE)"
 	ditto -c -k --keepParent "$(PROD_BUILD_DIR)/$(PROD_APP_NAME).app" "$(RELEASE_ARCHIVE)"
 	@echo "Created $(RELEASE_ARCHIVE)"
 
 appcast: $(SPARKLE_TOOLS_STAMP) release-archive check-eddsa-key
-	"$(SPARKLE_GENERATE_APPCAST)" --account "$(SPARKLE_ACCOUNT)" --download-url-prefix "$(DOWNLOAD_BASE_URL)" --output-path "$(DIST_DIR)/appcast.xml" "$(DIST_DIR)"
+	@tmpdir="$$(mktemp -d)"; \
+	trap 'rm -rf "'"'"'$$tmpdir'"'"'"' EXIT; \
+	key_file="$$tmpdir/ed25519_key"; \
+	"$(SPARKLE_GENERATE_KEYS)" --account "$(SPARKLE_ACCOUNT)" -x "$$key_file"; \
+	"$(SPARKLE_GENERATE_APPCAST)" --ed-key-file "$$key_file" --download-url-prefix "$(DOWNLOAD_BASE_URL)" -o "$(DIST_DIR)/appcast.xml" "$(DIST_DIR)"
+	python3 -c 'exec("\n".join(["from pathlib import Path", "import re", "import sys", "from xml.sax.saxutils import escape, unescape", "path = Path(sys.argv[1])", "text = path.read_text()", "item_pattern = re.compile(r\"(<item\\b[^>]*>)(.*?)(</item>)\", re.DOTALL)", "version_pattern = re.compile(r\"\\s*<sparkle:version>(.*?)</sparkle:version>\", re.DOTALL)", "enclosure_without_version_pattern = re.compile(r\"<enclosure\\b(?![^>]*\\bsparkle:version=)\")", "", "def transform_item(match):", "    start, body, end = match.groups()", "    versions = version_pattern.findall(body)", "    if not versions:", "        return match.group(0)", "    version = escape(unescape(versions[0].strip()), dict([(\"\\\"\", \"&quot;\")]))", "    body = version_pattern.sub(\"\", body)", "    if \"sparkle:version=\" not in body:", "        body, count = enclosure_without_version_pattern.subn(f\"<enclosure sparkle:version=\\\"{version}\\\"\", body, count=1)", "        if count != 1:", "            raise SystemExit(\"Missing enclosure for sparkle:version\")", "    return f\"{start}{body}{end}\"", "", "text = item_pattern.sub(transform_item, text)", "path.write_text(text)"]))' "$(DIST_DIR)/appcast.xml"
 	@echo "Created $(DIST_DIR)/appcast.xml"
 
 release: create-local-certificate generate-eddsa-key appcast
