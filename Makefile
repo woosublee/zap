@@ -48,12 +48,13 @@ all: sign
 swift-build:
 	swift build -c $(CONFIGURATION) --product "$(PRODUCT_NAME)"
 
-bundle: swift-build embed-sparkle $(INFO_PLIST) $(ENTITLEMENTS)
+bundle: swift-build $(INFO_PLIST) $(ENTITLEMENTS)
 	build_dir="$$(swift build -c "$(CONFIGURATION)" --show-bin-path)"; \
 	app_executable="$$build_dir/$(PRODUCT_NAME)"; \
 	test -x "$$app_executable" || { echo "Missing executable: $$app_executable"; exit 1; }; \
-	rm -rf "$(MACOS_DIR)" "$(RESOURCES_DIR)" "$(CONTENTS_DIR)/Info.plist"; \
+	rm -rf "$(APP_BUNDLE)"; \
 	mkdir -p "$(MACOS_DIR)" "$(RESOURCES_DIR)" "$(FRAMEWORKS_DIR)"; \
+	$(MAKE) embed-sparkle CONFIGURATION="$(CONFIGURATION)" BUILD_DIR="$(BUILD_DIR)"; \
 	ditto --norsrc --noextattr "$$app_executable" "$(MACOS_DIR)/$(APP_NAME)"; \
 	if ! otool -l "$(MACOS_DIR)/$(APP_NAME)" | grep -A2 LC_RPATH | grep -F "@executable_path/../Frameworks" >/dev/null; then \
 		install_name_tool -add_rpath "@executable_path/../Frameworks" "$(MACOS_DIR)/$(APP_NAME)"; \
@@ -89,25 +90,21 @@ embed-sparkle: swift-build
 	echo "Embedded $(FRAMEWORKS_DIR)/Sparkle.framework"
 
 sign: bundle
-	@if [ "$(CODESIGN_IDENTITY)" != "-" ]; then \
-		for item in \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/XPCServices/Installer.xpc" \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc" \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/Autoupdate" \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/Updater.app" \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/XPCServices/Installer.xpc" \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/XPCServices/Downloader.xpc" \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/Autoupdate" \
-			"$(FRAMEWORKS_DIR)/Sparkle.framework/Updater.app"; do \
-			if [ -e "$$item" ]; then \
-				codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$$item"; \
-			fi; \
-		done; \
-		codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$(FRAMEWORKS_DIR)/Sparkle.framework"; \
-		codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" --entitlements "$(ENTITLEMENTS)" "$(APP_BUNDLE)"; \
-	else \
-		codesign --force --sign "-" --entitlements "$(ENTITLEMENTS)" "$(APP_BUNDLE)"; \
-	fi
+	@for item in \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/XPCServices/Installer.xpc" \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc" \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/Autoupdate" \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/Versions/B/Updater.app" \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/XPCServices/Installer.xpc" \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/XPCServices/Downloader.xpc" \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/Autoupdate" \
+		"$(FRAMEWORKS_DIR)/Sparkle.framework/Updater.app"; do \
+		if [ -e "$$item" ]; then \
+			codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$$item"; \
+		fi; \
+	done
+	codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$(FRAMEWORKS_DIR)/Sparkle.framework"
+	codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" --entitlements "$(ENTITLEMENTS)" "$(APP_BUNDLE)"
 	xattr -r -c "$(APP_BUNDLE)"
 
 verify: sign
@@ -127,7 +124,7 @@ create-local-certificate:
 		echo "Reusing existing code signing certificate: $(LOCAL_CERTIFICATE_IDENTITY)"; \
 	else \
 		tmpdir="$$(mktemp -d)"; \
-		trap 'rm -rf "'"'$$tmpdir'"'"' EXIT; \
+		trap 'rm -rf "$$tmpdir"' EXIT; \
 		printf '%s\n' \
 			'[req]' \
 			'distinguished_name = req_distinguished_name' \
@@ -159,7 +156,7 @@ create-local-certificate:
 check-local-certificate:
 	@security find-certificate -c "$(LOCAL_CERTIFICATE_IDENTITY)" >/dev/null
 	@tmpdir="$$(mktemp -d)"; \
-	trap 'rm -rf "'"'$$tmpdir'"'"' EXIT; \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
 	probe="$$tmpdir/probe"; \
 	printf '#!/bin/sh\nexit 0\n' > "$$probe"; \
 	chmod +x "$$probe"; \

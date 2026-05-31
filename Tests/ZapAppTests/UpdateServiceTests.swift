@@ -7,6 +7,8 @@ final class UpdateServiceTests: XCTestCase {
         XCTAssertTrue(UpdateService.isReleaseBuildTagForAutomaticChecks("v0.1.2"))
         XCTAssertTrue(UpdateService.isReleaseBuildTagForAutomaticChecks("V1.2.3"))
         XCTAssertTrue(UpdateService.isReleaseBuildTagForAutomaticChecks("v1.2.3-beta.1"))
+        XCTAssertTrue(UpdateService.isReleaseBuildTagForAutomaticChecks("v1.2.3+build.123"))
+        XCTAssertTrue(UpdateService.isReleaseBuildTagForAutomaticChecks("v1.2.3-beta.1+build.123"))
 
         XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks(nil))
         XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks(""))
@@ -15,6 +17,9 @@ final class UpdateServiceTests: XCTestCase {
         XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks("dev-0.1.2"))
         XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks("v1"))
         XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks("v1.2"))
+        XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks("v1.2.3."))
+        XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks("v1..3"))
+        XCTAssertFalse(UpdateService.isReleaseBuildTagForAutomaticChecks("v1.2.3+"))
     }
 
     func testStartDoesNotStartUpdaterForLocalBuilds() {

@@ -63,14 +63,34 @@ final class UpdateService: ObservableObject {
 
         var normalized = buildTag
         normalized.removeFirst()
-        let versionAndPrerelease = normalized
+
+        let versionAndBuildMetadata = normalized
+            .split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false)
+        guard let versionPart = versionAndBuildMetadata.first,
+              !versionPart.isEmpty else {
+            return false
+        }
+
+        if versionAndBuildMetadata.count > 1 {
+            let buildMetadata = versionAndBuildMetadata[1]
+            let identifiers = buildMetadata.split(separator: ".", omittingEmptySubsequences: false)
+            guard !buildMetadata.isEmpty,
+                  !identifiers.isEmpty,
+                  identifiers.allSatisfy({ !$0.isEmpty }) else {
+                return false
+            }
+        }
+
+        let versionAndPrerelease = versionPart
             .split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
             .map(String.init)
         guard versionAndPrerelease.count >= 1 else { return false }
 
-        let coreComponents = versionAndPrerelease[0].split(separator: ".").map(String.init)
+        let coreComponents = versionAndPrerelease[0]
+            .split(separator: ".", omittingEmptySubsequences: false)
+            .map(String.init)
         guard coreComponents.count == 3,
-              coreComponents.allSatisfy({ Int($0) != nil }) else {
+              coreComponents.allSatisfy({ !$0.isEmpty && Int($0) != nil }) else {
             return false
         }
 

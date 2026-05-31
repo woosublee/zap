@@ -42,6 +42,30 @@ final class UpdateMetadataTests: XCTestCase {
         XCTAssertTrue(makefile.contains("security find-generic-password -s \"https://sparkle-project.org\" -a \"$(SPARKLE_ACCOUNT)\""))
     }
 
+    func testMakefileSignsNestedSparkleComponentsForAnyIdentity() throws {
+        let makefile = try loadMakefile()
+
+        XCTAssertFalse(makefile.contains("@if [ \"$(CODESIGN_IDENTITY)\" != \"-\" ]; then"))
+        XCTAssertTrue(makefile.contains("codesign --force $(CODESIGN_OPTIONS) --sign \"$(CODESIGN_IDENTITY)\" \"$$item\""))
+        XCTAssertTrue(makefile.contains("codesign --force $(CODESIGN_OPTIONS) --sign \"$(CODESIGN_IDENTITY)\" \"$(FRAMEWORKS_DIR)/Sparkle.framework\""))
+    }
+
+    func testMakefileCleansBundleBeforeEmbeddingSparkle() throws {
+        let makefile = try loadMakefile()
+
+        XCTAssertTrue(makefile.contains("bundle: swift-build $(INFO_PLIST) $(ENTITLEMENTS)"))
+        XCTAssertFalse(makefile.contains("bundle: swift-build embed-sparkle $(INFO_PLIST) $(ENTITLEMENTS)"))
+        XCTAssertTrue(makefile.contains("rm -rf \"$(APP_BUNDLE)\""))
+        XCTAssertTrue(makefile.contains("$(MAKE) embed-sparkle CONFIGURATION=\"$(CONFIGURATION)\" BUILD_DIR=\"$(BUILD_DIR)\""))
+    }
+
+    func testMakefileUsesSimpleTrapSyntax() throws {
+        let makefile = try loadMakefile()
+
+        XCTAssertTrue(makefile.contains("trap 'rm -rf \"$$tmpdir\"' EXIT"))
+        XCTAssertFalse(makefile.contains("trap 'rm -rf \"'\"'$$tmpdir'\"'\"' EXIT"))
+    }
+
     private func loadInfoPlist() throws -> [String: Any] {
         let data = try Data(contentsOf: URL(fileURLWithPath: "Info.plist"))
         let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
