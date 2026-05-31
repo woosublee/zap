@@ -25,11 +25,14 @@ final class UpdateMetadataTests: XCTestCase {
         XCTAssertTrue(makefile.contains("plutil -replace ZapBuildTag -string \"$(BUILD_TAG)\""))
     }
 
-    func testMakefileUsesZapReleaseSigningIdentity() throws {
+    func testMakefileUsesZapSigningIdentityForEveryBuild() throws {
         let makefile = try loadMakefile()
 
-        XCTAssertTrue(makefile.contains("RELEASE_CODESIGN_IDENTITY ?= zap"))
-        XCTAssertTrue(makefile.contains("LOCAL_CERTIFICATE_IDENTITY ?= $(RELEASE_CODESIGN_IDENTITY)"))
+        XCTAssertTrue(makefile.contains("CODESIGN_IDENTITY ?= zap"))
+        XCTAssertTrue(makefile.contains("RELEASE_CODESIGN_IDENTITY ?= $(CODESIGN_IDENTITY)"))
+        XCTAssertTrue(makefile.contains("LOCAL_CERTIFICATE_IDENTITY ?= $(CODESIGN_IDENTITY)"))
+        XCTAssertTrue(makefile.contains("dev-build:\n\t$(MAKE) sign APP_NAME=\"$(DEV_APP_NAME)\" BUNDLE_ID=\"$(DEV_BUNDLE_ID)\" BUILD_DIR=\"$(DEV_BUILD_DIR)\""))
+        XCTAssertFalse(makefile.contains("CODESIGN_IDENTITY=\"-\""))
     }
 
     func testMakefileUsesOfficialSparkleKeychainAccount() throws {

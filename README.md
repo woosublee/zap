@@ -129,9 +129,9 @@ The production app bundle is created at `/tmp/zap-bundles/prod/Zap.app`.
 
 ## Sparkle updates and release flow
 
-Zap uses Sparkle 2.9.2 for automatic updates. Update archives referenced by the appcast are verified with Sparkle EdDSA signatures, while the local production/release build path uses a self-signed macOS code signing identity named `zap`.
+Zap uses Sparkle 2.9.2 for automatic updates. Update archives referenced by the appcast are verified with Sparkle EdDSA signatures, while local app builds use a self-signed macOS code signing identity named `zap`.
 
-Development builds use ad-hoc signing by default with `CODESIGN_IDENTITY=-`. Release-oriented targets use `RELEASE_CODESIGN_IDENTITY ?= zap`.
+Development and production builds use `CODESIGN_IDENTITY ?= zap` by default. Release-oriented targets inherit this through `RELEASE_CODESIGN_IDENTITY ?= $(CODESIGN_IDENTITY)`.
 
 Sparkle automatic checks are enabled, automatic installs are disabled, and Zap does not set `SUUpdateCheckInterval`. Sparkle therefore uses its default automatic check interval of once per day.
 
