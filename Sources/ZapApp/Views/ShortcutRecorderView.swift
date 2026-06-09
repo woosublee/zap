@@ -9,17 +9,35 @@ struct RecordedShortcut {
 }
 
 struct ShortcutRecorderView: View {
-    let appName: String
+    let title: String
+    let instructions: String
+    let capturePrompt: String
     let onRecord: (RecordedShortcut) -> Void
     let onCancel: () -> Void
+
+    init(appName: String, onRecord: @escaping (RecordedShortcut) -> Void, onCancel: @escaping () -> Void) {
+        self.title = "Record App Shortcut"
+        self.instructions = "Press the global shortcut that opens \(appName)."
+        self.capturePrompt = "Press app shortcut"
+        self.onRecord = onRecord
+        self.onCancel = onCancel
+    }
+
+    init(windowActionName: String, onRecord: @escaping (RecordedShortcut) -> Void, onCancel: @escaping () -> Void) {
+        self.title = "Record Window Shortcut"
+        self.instructions = "Press the global shortcut that runs \(windowActionName)."
+        self.capturePrompt = "Press window shortcut"
+        self.onRecord = onRecord
+        self.onCancel = onCancel
+    }
 
     @State private var errorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Record Shortcut")
+            Text(title)
                 .font(.headline)
-            Text("Press the shortcut you want to use for \(appName).")
+            Text(instructions)
                 .foregroundStyle(.secondary)
 
             ShortcutCaptureView { event in
@@ -31,7 +49,7 @@ struct ShortcutRecorderView: View {
                     .stroke(Color.accentColor.opacity(0.55), lineWidth: 1)
             )
             .overlay {
-                Text("Press shortcut now")
+                Text(capturePrompt)
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.secondary)
             }

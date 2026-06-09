@@ -30,6 +30,17 @@ struct MenuBarView: View {
                 separator
             }
 
+            if let windowManagementError = model.windowManagementModel.windowManagementError {
+                Text(windowManagementError)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+
+                separator
+            }
+
             shortcutList
 
             separator

@@ -25,6 +25,7 @@ let package = Package(
             path: "Sources/ZapApp",
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("ApplicationServices"),
                 .linkedFramework("Carbon"),
                 .linkedFramework("ServiceManagement")
             ]
