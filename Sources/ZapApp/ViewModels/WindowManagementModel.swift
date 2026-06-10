@@ -91,6 +91,7 @@ final class WindowManagementModel: ObservableObject {
             return
         }
         shortcutRegistrationError = nil
+        // Recording uses a sheet and can leave a transient window-management error; a successful shortcut update clears it.
         windowManagementError = nil
         updateShortcut(action: action) { shortcut in
             shortcut.keyCode = keyCode

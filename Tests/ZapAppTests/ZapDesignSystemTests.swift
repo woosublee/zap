@@ -26,4 +26,16 @@ final class ZapDesignSystemTests: XCTestCase {
         XCTAssertTrue(source.contains("if token == \"+\", characterIndex == shortcut.indices.last"))
         XCTAssertFalse(source.contains("token != \"+\" && token != \" \""))
     }
+
+    func testShortcutKeycapGroupTreatsNilAndEmptyShortcutAsUnset() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/ZapDesignSystem.swift"))
+
+        XCTAssertTrue(source.contains("private var isShortcutUnset: Bool"))
+        XCTAssertTrue(source.contains("shortcut?.isEmpty ?? true"))
+        XCTAssertTrue(source.contains("isDisabled || isShortcutUnset"))
+        XCTAssertTrue(source.contains("isShortcutUnset ? \"Shortcut not set\""))
+        XCTAssertTrue(source.contains("guard let shortcut, !isShortcutUnset else { return [\"Not set\"] }"))
+        XCTAssertFalse(source.contains("isDisabled || shortcut == nil"))
+    }
 }

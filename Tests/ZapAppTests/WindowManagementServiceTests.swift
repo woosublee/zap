@@ -227,6 +227,45 @@ final class WindowManagementServiceTests: XCTestCase {
         XCTAssertEqual(history.records.count, 0)
     }
 
+    func testPerformFailsAndSignalsFeedbackWhenActualFrameRemainsUnchangedAfterSetFrame() {
+        let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
+        let currentFrame = CGRect(x: 100, y: 100, width: 500, height: 400)
+        let requestedFrame = CGRect(x: 0, y: 25, width: 500, height: 400)
+        let windows = MockAccessibilityWindows(frontmostWindow: window)
+        windows.frameResults = [.success(currentFrame), .success(currentFrame), .success(currentFrame)]
+        let calculator = MockWindowPositionCalculator(result: WindowCalculationResult(frame: requestedFrame, resolvedAction: .leftHalf))
+        let history = MockWindowHistoryRecorder()
+        let feedback = MockFailureFeedback()
+        let service = makeService(windows: windows, calculator: calculator, history: history, feedback: feedback)
+
+        let result = service.perform(action: .leftHalf)
+
+        XCTAssertEqual(result, .failure(.setFrameFailed))
+        XCTAssertEqual(feedback.failureCount, 1)
+        XCTAssertEqual(windows.capturedSetFrames, [requestedFrame, requestedFrame])
+        XCTAssertEqual(windows.frameCallCount, 3)
+        XCTAssertEqual(history.records.count, 0)
+    }
+
+    func testUndoFailsAndSignalsFeedbackWhenActualFrameRemainsUnchangedAfterSetFrame() {
+        let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
+        let currentFrame = CGRect(x: 0, y: 25, width: 720, height: 875)
+        let undoFrame = CGRect(x: 100, y: 100, width: 500, height: 400)
+        let windows = MockAccessibilityWindows(frontmostWindow: window)
+        windows.frameResults = [.success(currentFrame), .success(currentFrame)]
+        let history = MockWindowHistoryRecorder()
+        history.undoItem = WindowHistoryItem(applicationIdentifier: "com.example.App", windowFrame: undoFrame)
+        let feedback = MockFailureFeedback()
+        let service = makeService(windows: windows, history: history, feedback: feedback)
+
+        let result = service.perform(action: .undo)
+
+        XCTAssertEqual(result, .failure(.setFrameFailed))
+        XCTAssertEqual(feedback.failureCount, 1)
+        XCTAssertEqual(windows.capturedSetFrames, [undoFrame])
+        XCTAssertEqual(history.records.count, 0)
+    }
+
     func testPerformFailsWhenCalculationReturnsNil() {
         let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
         let windows = MockAccessibilityWindows(frontmostWindow: window)

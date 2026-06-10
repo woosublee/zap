@@ -64,7 +64,7 @@ struct ZapApp: App {
         }
     }
 
-    private func openSettings(initialMode: SettingsMode = .automatic) {
+    private func openSettings(initialMode: SettingsMode? = nil) {
         SettingsWindowPresenter.open(
             model: model,
             updateService: updateService,

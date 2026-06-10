@@ -106,14 +106,18 @@ struct ShortcutKeycapGroupView: View {
     var body: some View {
         HStack(spacing: 4) {
             ForEach(tokens, id: \.self) { token in
-                ShortcutKeycapView(label: token, isDisabled: isDisabled || shortcut == nil)
+                ShortcutKeycapView(label: token, isDisabled: isDisabled || isShortcutUnset)
             }
         }
-        .accessibilityLabel(shortcut ?? "Shortcut not set")
+        .accessibilityLabel(isShortcutUnset ? "Shortcut not set" : shortcut ?? "Shortcut not set")
+    }
+
+    private var isShortcutUnset: Bool {
+        shortcut?.isEmpty ?? true
     }
 
     private var tokens: [String] {
-        guard let shortcut, !shortcut.isEmpty else { return ["Not set"] }
+        guard let shortcut, !isShortcutUnset else { return ["Not set"] }
 
         let modifiers = Set(["⌘", "⌃", "⌥", "⇧"])
         var output: [String] = []

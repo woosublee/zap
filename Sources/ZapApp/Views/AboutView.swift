@@ -1,4 +1,10 @@
+import CoreGraphics
 import SwiftUI
+
+enum AboutLayout {
+    static let contentWidth: CGFloat = 292
+    static let windowHeight: CGFloat = 260
+}
 
 struct AboutView: View {
     let presentation: AboutPresentation
@@ -24,6 +30,6 @@ struct AboutView: View {
                 .foregroundStyle(.tint)
         }
         .padding(28)
-        .frame(width: 292)
+        .frame(width: AboutLayout.contentWidth)
     }
 }

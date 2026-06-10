@@ -49,8 +49,10 @@ final class ShortcutRecorderViewTests: XCTestCase {
             .appendingPathComponent("Sources/ZapApp/Views/ShortcutRecorderView.swift"))
 
         XCTAssertTrue(source.contains("NSEvent.addLocalMonitorForEvents(matching: .keyDown)"))
-        XCTAssertFalse(source.contains("guard event.window === self.window else { return event }"))
-        XCTAssertTrue(source.contains("guard self.window != nil else { return event }"))
+        XCTAssertTrue(source.contains("guard let window = self.window,"))
+        XCTAssertTrue(source.contains("window.isKeyWindow,"))
+        XCTAssertTrue(source.contains("event.window === window else"))
+        XCTAssertFalse(source.contains("guard self.window != nil else { return event }"))
         XCTAssertTrue(source.contains("onKeyDown(event)"))
         XCTAssertTrue(source.contains("return nil"))
         XCTAssertTrue(source.contains("NSEvent.removeMonitor(monitor)"))
@@ -66,8 +68,10 @@ final class ShortcutRecorderViewTests: XCTestCase {
         XCTAssertFalse(source.contains("Button(\"Disable\")"))
         XCTAssertTrue(source.contains("setEnabled(!shortcut.isEnabled)"))
         XCTAssertFalse(source.contains("Toggle(\"\", isOn: Binding("))
-        XCTAssertTrue(source.contains("ShortcutKeycapGroupView(shortcut: shortcutTitle, isDisabled: !shortcut.isEnabled)"))
-        XCTAssertFalse(source.contains(".disabled(isLocked)\n            .accessibilityLabel(\"Record shortcut"))
+        XCTAssertTrue(source.contains("private var canRecordShortcut: Bool"))
+        XCTAssertTrue(source.contains("guard canRecordShortcut else { return }"))
+        XCTAssertTrue(source.contains("ShortcutKeycapGroupView(shortcut: shortcutTitle, isDisabled: !canRecordShortcut)"))
+        XCTAssertTrue(source.contains(".disabled(!canRecordShortcut)"))
         XCTAssertTrue(source.contains("WindowActionDiagramView(action: shortcut.action)"))
     }
 }

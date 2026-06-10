@@ -170,7 +170,11 @@ private final class KeyCaptureView: NSView {
         guard keyDownMonitor == nil else { return }
         keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            guard self.window != nil else { return event }
+            guard let window = self.window,
+                  window.isKeyWindow,
+                  event.window === window else {
+                return event
+            }
             onKeyDown(event)
             return nil
         }

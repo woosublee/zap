@@ -214,7 +214,8 @@ final class GlobalHotKeyRegistrationPlanTests: XCTestCase {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Services/GlobalHotKeyService.swift"))
 
-        XCTAssertTrue(source.contains("RegisterEventHotKey(\n            hotKey.keyCode,\n            hotKey.modifiers,\n            hotKeyID,\n            GetEventDispatcherTarget(),"))
+        let pattern = #"RegisterEventHotKey\(\s*hotKey\.keyCode,\s*hotKey\.modifiers,\s*hotKeyID,\s*GetEventDispatcherTarget\(\),\s*0,\s*&ref\s*\)"#
+        XCTAssertNotNil(source.range(of: pattern, options: .regularExpression))
     }
 
     private var planner: GlobalHotKeyRegistrationPlanner {

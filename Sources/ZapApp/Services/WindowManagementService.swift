@@ -157,7 +157,7 @@ struct WindowManagementService {
         }
 
         guard !actualFrame.equalTo(currentFrame) else {
-            return .success(action: result.resolvedAction, frame: actualFrame)
+            return fail(.setFrameFailed)
         }
 
         history.recordSuccessfulMove(
@@ -216,6 +216,10 @@ struct WindowManagementService {
             actualFrame = try windows.frame(of: window)
         } catch {
             return fail(.frameReadFailed)
+        }
+
+        guard !actualFrame.equalTo(currentFrame) else {
+            return fail(.setFrameFailed)
         }
 
         return .success(action: action, frame: actualFrame)

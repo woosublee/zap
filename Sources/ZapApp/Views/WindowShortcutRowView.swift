@@ -16,6 +16,10 @@ struct WindowShortcutRowView: View {
         return WindowShortcutDisplay.shortcutTitle(for: shortcut)
     }
 
+    private var canRecordShortcut: Bool {
+        !isLocked && shortcut.isEnabled
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             WindowActionDiagramView(action: shortcut.action)
@@ -26,12 +30,14 @@ struct WindowShortcutRowView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
+                guard canRecordShortcut else { return }
                 setRecordingActive(true)
                 isRecording = true
             } label: {
-                ShortcutKeycapGroupView(shortcut: shortcutTitle, isDisabled: !shortcut.isEnabled)
+                ShortcutKeycapGroupView(shortcut: shortcutTitle, isDisabled: !canRecordShortcut)
             }
             .buttonStyle(.plain)
+            .disabled(!canRecordShortcut)
             .accessibilityLabel("Record shortcut for \(shortcut.action.title)")
             .help("Record shortcut")
 

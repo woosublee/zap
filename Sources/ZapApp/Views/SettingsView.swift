@@ -3,23 +3,37 @@ import ZapCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+final class SettingsNavigationState: ObservableObject {
+    @Published var selectedMode: SettingsMode
+
+    init(selectedMode: SettingsMode = .automatic) {
+        self.selectedMode = selectedMode
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: ZapAppModel
     @ObservedObject var updateService: UpdateService
     @Binding var showMenuBarIcon: Bool
-    @State private var selectedMode: SettingsMode
+    @ObservedObject private var navigationState: SettingsNavigationState
     @State private var recordingShortcut: ManualShortcut?
 
     init(
         model: ZapAppModel,
         updateService: UpdateService,
         showMenuBarIcon: Binding<Bool>,
-        initialMode: SettingsMode = .automatic
+        initialMode: SettingsMode = .automatic,
+        navigationState: SettingsNavigationState? = nil
     ) {
         self.model = model
         self.updateService = updateService
         _showMenuBarIcon = showMenuBarIcon
-        _selectedMode = State(initialValue: initialMode)
+        self.navigationState = navigationState ?? SettingsNavigationState(selectedMode: initialMode)
+    }
+
+    private var selectedMode: SettingsMode {
+        get { navigationState.selectedMode }
+        nonmutating set { navigationState.selectedMode = newValue }
     }
 
     var body: some View {
@@ -42,8 +56,8 @@ struct SettingsView: View {
                             registrationError: model.registrationError,
                             inputSourceRevision: model.inputSourceRevision
                         )
-                    case .setting:
-                        settingSection
+                    case .general:
+                        generalSection
                     case .about:
                         aboutSection
                     }
@@ -103,7 +117,7 @@ struct SettingsView: View {
 
             sidebarSection(title: "Shortcuts", modes: [.automatic, .manual, .windowManagement])
 
-            sidebarSection(title: "System", modes: [.setting, .about])
+            sidebarSection(title: "System", modes: [.general, .about])
                 .padding(.top, 10)
 
             Spacer()
@@ -143,7 +157,7 @@ struct SettingsView: View {
         )
     }
 
-    private var settingSection: some View {
+    private var generalSection: some View {
         VStack(alignment: .leading, spacing: ZapSpacing.large) {
             permissionsSection
             behaviorSection
@@ -346,7 +360,7 @@ enum SettingsMode: String, CaseIterable, Identifiable {
     case automatic
     case manual
     case windowManagement
-    case setting
+    case general
     case about
 
     var id: String { rawValue }
@@ -356,7 +370,7 @@ enum SettingsMode: String, CaseIterable, Identifiable {
         case .automatic: "Automatic"
         case .manual: "Manual"
         case .windowManagement: "Window Management"
-        case .setting: "Setting"
+        case .general: "General"
         case .about: "About"
         }
     }
@@ -366,7 +380,7 @@ enum SettingsMode: String, CaseIterable, Identifiable {
         case .automatic: "sparkle"
         case .manual: "keyboard"
         case .windowManagement: "rectangle.3.group"
-        case .setting: "gearshape"
+        case .general: "gearshape"
         case .about: "info.circle"
         }
     }

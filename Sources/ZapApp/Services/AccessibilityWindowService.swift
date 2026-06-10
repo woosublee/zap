@@ -173,20 +173,6 @@ struct AccessibilityWindowService: AccessibilityWindowControlling {
         screens.displayFrames.first?.frame.maxY
     }
 
-    private func screenContainingTopLeft(of frame: CGRect) -> DisplayFrame? {
-        screen(containing: frame.origin)
-    }
-
-    private func screenContainingBottomLeft(of frame: CGRect) -> DisplayFrame? {
-        screen(containing: CGPoint(x: frame.minX, y: frame.minY))
-    }
-
-    private func screen(containing point: CGPoint) -> DisplayFrame? {
-        screens.displayFrames.first { display in
-            display.frame.contains(point) || display.visibleFrame.contains(point)
-        } ?? screens.displayFrames.first(where: \.isMain) ?? screens.displayFrames.first
-    }
-
     private func writeSize(_ size: CGSize, to element: AccessibilityElement) throws {
         do {
             try client.setCGSizeAttribute(AXAttribute.size, of: element, value: size)
