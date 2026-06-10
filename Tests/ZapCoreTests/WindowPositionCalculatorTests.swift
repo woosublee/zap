@@ -45,6 +45,25 @@ final class WindowPositionCalculatorTests: XCTestCase {
         XCTAssertEqual(calculate(.rightHalf, window: rightTwoThirds).frame, rightOneThird)
     }
 
+    func testHalvesCycleWhenAppliedWindowIsSlightlyConstrainedByDisplayOrApp() {
+        let leftDisplay = CGRect(x: -2560, y: 0, width: 2560, height: 1440)
+        let constrainedLeftHalf = CGRect(x: -2560, y: 0, width: 1280, height: 1410)
+        let constrainedLeftTwoThirds = CGRect(x: -2560, y: 0, width: 1706, height: 1410)
+        let leftTwoThirds = CGRect(x: -2560, y: 0, width: 1706, height: 1440)
+        let leftOneThird = CGRect(x: -2560, y: 0, width: 853, height: 1440)
+
+        XCTAssertEqual(calculate(.leftHalf, window: constrainedLeftHalf, visibleFrame: leftDisplay).frame, leftTwoThirds)
+        XCTAssertEqual(calculate(.leftHalf, window: constrainedLeftTwoThirds, visibleFrame: leftDisplay).frame, leftOneThird)
+
+        let constrainedRightHalf = CGRect(x: -1280, y: 0, width: 1280, height: 1410)
+        let constrainedRightTwoThirds = CGRect(x: -1706, y: 0, width: 1706, height: 1410)
+        let rightTwoThirds = CGRect(x: -1706, y: 0, width: 1706, height: 1440)
+        let rightOneThird = CGRect(x: -853, y: 0, width: 853, height: 1440)
+
+        XCTAssertEqual(calculate(.rightHalf, window: constrainedRightHalf, visibleFrame: leftDisplay).frame, rightTwoThirds)
+        XCTAssertEqual(calculate(.rightHalf, window: constrainedRightTwoThirds, visibleFrame: leftDisplay).frame, rightOneThird)
+    }
+
     func testCornersUseVisibleFrameQuadrantsWithFloorAndRemainderPlacement() {
         XCTAssertEqual(calculate(.upperLeft).frame, CGRect(x: 0, y: 463, width: 720, height: 437))
         XCTAssertEqual(calculate(.upperRight).frame, CGRect(x: 720, y: 463, width: 720, height: 437))
@@ -122,12 +141,14 @@ final class WindowPositionCalculatorTests: XCTestCase {
 
     private func calculate(
         _ action: WindowAction,
-        window: CGRect = CGRect(x: 100, y: 100, width: 600, height: 400)
+        window: CGRect = CGRect(x: 100, y: 100, width: 600, height: 400),
+        visibleFrame: CGRect? = nil
     ) -> WindowCalculationResult {
-        WindowPositionCalculator().calculate(WindowCalculationInput(
+        let visibleFrame = visibleFrame ?? visible
+        return WindowPositionCalculator().calculate(WindowCalculationInput(
             windowFrame: window,
-            sourceVisibleFrame: visible,
-            destinationVisibleFrame: visible,
+            sourceVisibleFrame: visibleFrame,
+            destinationVisibleFrame: visibleFrame,
             action: action
         ))
     }

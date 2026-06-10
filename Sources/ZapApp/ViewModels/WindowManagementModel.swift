@@ -24,6 +24,7 @@ final class WindowManagementModel: ObservableObject {
     @Published private(set) var accessibilityTrusted: Bool
     @Published private(set) var windowManagementError: String?
     @Published private(set) var shortcutRegistrationError: String?
+    @Published private(set) var isShortcutRecordingActive: Bool
     @Published var isWindowManagementEnabled: Bool
 
     var onShortcutConfigurationChanged: (() -> Void)?
@@ -51,11 +52,12 @@ final class WindowManagementModel: ObservableObject {
         self.accessibilityTrusted = permissionService.isTrusted
         self.windowManagementError = nil
         self.shortcutRegistrationError = nil
+        self.isShortcutRecordingActive = false
         self.isWindowManagementEnabled = isWindowManagementEnabled ?? settingsStore.loadWindowManagementEnabled()
     }
 
     var windowShortcutsForRegistration: [WindowShortcut] {
-        guard isWindowManagementEnabled else { return [] }
+        guard isWindowManagementEnabled, !isShortcutRecordingActive else { return [] }
         return windowShortcuts.filter(\.canRegister)
     }
 
@@ -77,12 +79,20 @@ final class WindowManagementModel: ObservableObject {
         notifyShortcutConfigurationChanged()
     }
 
+    func setShortcutRecordingActive(_ isActive: Bool) {
+        guard isShortcutRecordingActive != isActive else { return }
+        isShortcutRecordingActive = isActive
+        notifyShortcutConfigurationChanged()
+    }
+
     func setShortcut(action: WindowAction, keyCode: UInt32, keyDisplayName: String, modifiers: Set<ShortcutModifier>) {
         guard !modifiers.isEmpty else {
             shortcutRegistrationError = "Select at least one modifier key."
             return
         }
         shortcutRegistrationError = nil
+        // Recording uses a sheet and can leave a transient window-management error; a successful shortcut update clears it.
+        windowManagementError = nil
         updateShortcut(action: action) { shortcut in
             shortcut.keyCode = keyCode
             shortcut.keyDisplayName = keyDisplayName

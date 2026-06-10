@@ -104,7 +104,7 @@ public struct WindowPositionCalculator: Sendable {
 
     private func leftWeightedRect(in visibleFrame: CGRect, currentWindow: CGRect, height: CGFloat, y: CGFloat) -> CGRect {
         let base = CGRect(x: visibleFrame.minX, y: y, width: halfWidth(visibleFrame), height: height)
-        guard abs(currentWindow.midY - base.midY) <= 1 else { return base }
+        guard abs(currentWindow.midY - base.midY) <= constrainedFrameTolerance(for: visibleFrame.height) else { return base }
 
         let twoThirds = CGRect(
             x: visibleFrame.minX,
@@ -124,7 +124,7 @@ public struct WindowPositionCalculator: Sendable {
     private func rightWeightedRect(in visibleFrame: CGRect, currentWindow: CGRect, height: CGFloat, y: CGFloat) -> CGRect {
         let baseWidth = halfWidth(visibleFrame)
         let base = CGRect(x: visibleFrame.minX + baseWidth, y: y, width: baseWidth, height: height)
-        guard abs(currentWindow.midY - base.midY) <= 1 else { return base }
+        guard abs(currentWindow.midY - base.midY) <= constrainedFrameTolerance(for: visibleFrame.height) else { return base }
 
         let twoThirdsWidth = floor(visibleFrame.width * 2 / 3)
         let twoThirds = CGRect(
@@ -147,7 +147,7 @@ public struct WindowPositionCalculator: Sendable {
         let baseHeight = halfHeight(visibleFrame)
         let baseY = edge == .top ? upperY(visibleFrame) : visibleFrame.minY
         let base = CGRect(x: visibleFrame.minX, y: baseY, width: visibleFrame.width, height: baseHeight)
-        guard abs(currentWindow.midX - base.midX) <= 1 else { return base }
+        guard abs(currentWindow.midX - base.midX) <= constrainedFrameTolerance(for: visibleFrame.width) else { return base }
 
         let twoThirdsHeight = floor(visibleFrame.height * 2 / 3)
         let twoThirdsY = edge == .top ? visibleFrame.maxY - twoThirdsHeight : visibleFrame.minY
@@ -165,8 +165,12 @@ public struct WindowPositionCalculator: Sendable {
 
     private func rectCenteredWithinRect(_ container: CGRect, _ rect: CGRect) -> Bool {
         container.contains(rect)
-            && abs(container.midX - rect.midX) <= 1
-            && abs(container.midY - rect.midY) <= 1
+            && abs(container.midX - rect.midX) <= constrainedFrameTolerance(for: container.width)
+            && abs(container.midY - rect.midY) <= constrainedFrameTolerance(for: container.height)
+    }
+
+    private func constrainedFrameTolerance(for length: CGFloat) -> CGFloat {
+        min(32, max(1, length * 0.03))
     }
 }
 

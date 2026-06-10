@@ -7,6 +7,7 @@ enum UnsupportedWindowReason: Equatable {
 }
 
 enum WindowManagementError: Equatable {
+    case accessibilityAPIDisabled
     case accessibilityPermissionMissing
     case focusedWindowMissing
     case unsupportedWindow(UnsupportedWindowReason)
@@ -74,6 +75,8 @@ struct WindowManagementService {
         let window: AccessibilityWindow
         do {
             window = try windows.frontmostWindow()
+        } catch AccessibilityWindowError.accessibilityAPIDisabled {
+            return fail(.accessibilityAPIDisabled)
         } catch AccessibilityWindowError.focusedWindowMissing {
             return fail(.focusedWindowMissing)
         } catch {
@@ -127,11 +130,30 @@ struct WindowManagementService {
             return fail(.setFrameFailed)
         }
 
-        let actualFrame: CGRect
+        var actualFrame: CGRect
         do {
             actualFrame = try windows.frame(of: window)
         } catch {
             return fail(.frameReadFailed)
+        }
+
+        let bestEffortFrame = bestEffortFrame(
+            requestedFrame: result.frame,
+            movedFrame: actualFrame,
+            visibleFrame: displayContext.destinationVisibleFrame
+        )
+        if !bestEffortFrame.equalTo(actualFrame) {
+            do {
+                try windows.setFrame(bestEffortFrame, of: window)
+            } catch {
+                return fail(.setFrameFailed)
+            }
+
+            do {
+                actualFrame = try windows.frame(of: window)
+            } catch {
+                return fail(.frameReadFailed)
+            }
         }
 
         guard !actualFrame.equalTo(currentFrame) else {
@@ -144,6 +166,24 @@ struct WindowManagementService {
             targetFrame: actualFrame
         )
         return .success(action: result.resolvedAction, frame: actualFrame)
+    }
+
+    private func bestEffortFrame(requestedFrame: CGRect, movedFrame: CGRect, visibleFrame: CGRect) -> CGRect {
+        var adjusted = requestedFrame
+        if movedFrame.minX < visibleFrame.minX {
+            adjusted.origin.x = visibleFrame.minX
+        } else if movedFrame.maxX > visibleFrame.maxX {
+            adjusted.origin.x = visibleFrame.maxX - movedFrame.width
+        }
+
+        if movedFrame.minY < visibleFrame.minY {
+            adjusted.origin.y = visibleFrame.minY
+        } else if movedFrame.maxY > visibleFrame.maxY {
+            adjusted.origin.y = visibleFrame.maxY - movedFrame.height
+        }
+
+        adjusted.size = movedFrame.size
+        return adjusted
     }
 
     private func performHistoryAction(
@@ -176,6 +216,10 @@ struct WindowManagementService {
             actualFrame = try windows.frame(of: window)
         } catch {
             return fail(.frameReadFailed)
+        }
+
+        guard !actualFrame.equalTo(currentFrame) else {
+            return fail(.setFrameFailed)
         }
 
         return .success(action: action, frame: actualFrame)

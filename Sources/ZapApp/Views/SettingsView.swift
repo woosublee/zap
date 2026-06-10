@@ -3,40 +3,71 @@ import ZapCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+final class SettingsNavigationState: ObservableObject {
+    @Published var selectedMode: SettingsMode
+
+    init(selectedMode: SettingsMode = .automatic) {
+        self.selectedMode = selectedMode
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: ZapAppModel
     @ObservedObject var updateService: UpdateService
     @Binding var showMenuBarIcon: Bool
-    @State private var selectedMode = SettingsMode.automatic
+    @ObservedObject private var navigationState: SettingsNavigationState
     @State private var recordingShortcut: ManualShortcut?
 
+    init(
+        model: ZapAppModel,
+        updateService: UpdateService,
+        showMenuBarIcon: Binding<Bool>,
+        initialMode: SettingsMode = .automatic,
+        navigationState: SettingsNavigationState? = nil
+    ) {
+        self.model = model
+        self.updateService = updateService
+        _showMenuBarIcon = showMenuBarIcon
+        self.navigationState = navigationState ?? SettingsNavigationState(selectedMode: initialMode)
+    }
+
+    private var selectedMode: SettingsMode {
+        get { navigationState.selectedMode }
+        nonmutating set { navigationState.selectedMode = newValue }
+    }
+
     var body: some View {
-        Form {
-            Section {
-                Picker("Mode", selection: $selectedMode) {
-                    ForEach(SettingsMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
+        HStack(spacing: 0) {
+            settingsSidebar
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: ZapSpacing.large) {
+                    switch selectedMode {
+                    case .automatic:
+                        automaticShortcutsSection
+                        automaticSection
+                    case .manual:
+                        manualSection
+                    case .windowManagement:
+                        WindowManagementSettingsView(
+                            model: model.windowManagementModel,
+                            registrationError: model.registrationError,
+                            inputSourceRevision: model.inputSourceRevision
+                        )
+                    case .general:
+                        generalSection
+                    case .about:
+                        aboutSection
                     }
                 }
-                .pickerStyle(.segmented)
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-
-            switch selectedMode {
-            case .automatic:
-                automaticShortcutsSection
-                automaticSection
-            case .manual:
-                manualSection
-            case .windowManagement:
-                WindowManagementSettingsView(model: model.windowManagementModel, registrationError: model.registrationError)
-            }
-
-            behaviorSection
-            updatesSection
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.55))
         }
-        .formStyle(.grouped)
-        .padding(20)
-        .frame(width: 500, height: 640)
+        .frame(width: 820, height: 640)
         .sheet(item: $recordingShortcut) { shortcut in
             ShortcutRecorderView(
                 appName: shortcut.name,
@@ -54,6 +85,66 @@ struct SettingsView: View {
                 }
             )
         }
+        .onAppear {
+            refreshAccessibilityPermission()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshAccessibilityPermission()
+        }
+    }
+
+    private func refreshAccessibilityPermission() {
+        model.windowManagementModel.refreshAccessibilityPermission()
+    }
+
+    private var settingsSidebar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 9) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 28, height: 28)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(AboutPresentation.currentAppName)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Keyboard-first control")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.bottom, 12)
+
+            sidebarSection(title: "Shortcuts", modes: [.automatic, .manual, .windowManagement])
+
+            sidebarSection(title: "System", modes: [.general, .about])
+                .padding(.top, 10)
+
+            Spacer()
+        }
+        .padding(14)
+        .frame(width: 216)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(.bar)
+    }
+
+    private func sidebarSection(title: String, modes: [SettingsMode]) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .padding(.horizontal, 10)
+
+            ForEach(modes) { mode in
+                SettingsSidebarItem(
+                    mode: mode,
+                    isSelected: selectedMode == mode
+                ) {
+                    selectedMode = mode
+                }
+            }
+        }
     }
 
     private var menuBarIconBinding: Binding<Bool> {
@@ -66,20 +157,61 @@ struct SettingsView: View {
         )
     }
 
-    private var automaticShortcutsSection: some View {
-        Section("Shortcuts") {
-            dockModifierSelector
-            Toggle(isOn: $model.isFinderShortcutEnabled) {
-                HStack(spacing: 4) {
-                    Text("Finder shortcut")
-                    Text("(\(model.finderShortcutKeyTitle))")
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundStyle(.secondary)
+    private var generalSection: some View {
+        VStack(alignment: .leading, spacing: ZapSpacing.large) {
+            permissionsSection
+            behaviorSection
+            updatesSection
+        }
+    }
+
+    private var aboutSection: some View {
+        HStack {
+            Spacer(minLength: 0)
+            AboutView(presentation: AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current))
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var permissionsSection: some View {
+        SettingsCard(title: "Permissions") {
+            SettingsRow(
+                title: "Accessibility",
+                subtitle: "Allow Zap to move and resize windows.",
+                leading: {
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 24)
+                },
+                trailing: {
+                    if model.windowManagementModel.accessibilityTrusted {
+                        Label("Granted", systemImage: "checkmark.circle.fill")
+                            .font(.system(.callout, design: .default, weight: .semibold))
+                            .foregroundStyle(.green)
+                    } else {
+                        Button("Request") {
+                            model.windowManagementModel.requestAccessibilityPermission()
+                            refreshAccessibilityPermission()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
                 }
-            }
+            )
+        }
+    }
+
+    private var automaticShortcutsSection: some View {
+        SettingsCard(title: "Shortcuts", subtitle: "Choose the global modifiers Zap uses for Dock and Finder actions.") {
+            dockModifierSelector
+
+            Toggle("Finder shortcut", isOn: $model.isFinderShortcutEnabled)
+                .toggleStyle(.switch)
 
             if let registrationError = model.registrationError {
-                Text(registrationError)
+                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -107,23 +239,32 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("+ 1–9")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                ShortcutKeycapView(label: "1–9")
             }
         }
     }
 
     private var automaticSection: some View {
-        Section {
-            Text("Pinned Dock apps mapped to 1–9.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        SettingsCard(title: "Automatic Dock Apps", subtitle: "Pinned Dock apps mapped to number keys.") {
+            HStack {
+                Text("Refresh the Dock when pinned apps change.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    model.refreshDockItems()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .controlSize(.small)
+            }
 
             LazyVGrid(columns: automaticShortcutColumns, alignment: .leading, spacing: 8) {
-                if model.isFinderShortcutEnabled {
-                    ShortcutListRow(shortcut: model.finderShortcutTitle, title: "Finder")
-                }
+                ShortcutListRow(
+                    shortcut: model.finderShortcutTitle,
+                    title: "Finder",
+                    isDisabled: !model.isFinderShortcutEnabled
+                )
 
                 ForEach(NumberKey.allCases) { key in
                     ShortcutListRow(
@@ -132,18 +273,6 @@ struct SettingsView: View {
                         isEmpty: model.dockItem(for: key) == nil
                     )
                 }
-            }
-        } header: {
-            HStack {
-                Text("Automatic Dock Apps")
-                Spacer()
-                Button {
-                    model.refreshDockItems()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.borderless)
-                .help("Refresh Dock Apps")
             }
         }
     }
@@ -156,12 +285,12 @@ struct SettingsView: View {
     }
 
     private var behaviorSection: some View {
-        Section("Behavior") {
+        SettingsCard(title: "Behavior") {
             Toggle("Launch at login", isOn: $model.startAtLogin)
             Toggle("Show menu bar icon", isOn: menuBarIconBinding)
 
             if let loginItemError = model.loginItemError {
-                Text(loginItemError)
+                Label(loginItemError, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -169,7 +298,7 @@ struct SettingsView: View {
     }
 
     private var updatesSection: some View {
-        Section("Updates") {
+        SettingsCard(title: "Updates") {
             Toggle("Automatically check for updates", isOn: $updateService.automaticallyChecksForUpdates)
 
             Button("Check for Updates Now") {
@@ -183,11 +312,7 @@ struct SettingsView: View {
     }
 
     private var manualSection: some View {
-        Section("Manual App Shortcuts") {
-            Text("Add apps and assign custom global shortcuts.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
+        SettingsCard(title: "Manual App Shortcuts", subtitle: "Add apps and assign custom global shortcuts.") {
             Button("Add App Shortcut...") {
                 addManualShortcut()
             }
@@ -195,6 +320,8 @@ struct SettingsView: View {
             if model.manualShortcuts.isEmpty {
                 Text("No manual shortcuts")
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 18)
             }
 
             ForEach(model.manualShortcuts) { shortcut in
@@ -207,7 +334,7 @@ struct SettingsView: View {
             }
 
             if let registrationError = model.registrationError {
-                Text(registrationError)
+                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -233,6 +360,8 @@ enum SettingsMode: String, CaseIterable, Identifiable {
     case automatic
     case manual
     case windowManagement
+    case general
+    case about
 
     var id: String { rawValue }
 
@@ -241,7 +370,51 @@ enum SettingsMode: String, CaseIterable, Identifiable {
         case .automatic: "Automatic"
         case .manual: "Manual"
         case .windowManagement: "Window Management"
+        case .general: "General"
+        case .about: "About"
         }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .automatic: "sparkle"
+        case .manual: "keyboard"
+        case .windowManagement: "rectangle.3.group"
+        case .general: "gearshape"
+        case .about: "info.circle"
+        }
+    }
+}
+
+private struct SettingsSidebarItem: View {
+    let mode: SettingsMode
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: mode.systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 18)
+                Text(mode.title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(mode.title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 }
 
@@ -252,17 +425,7 @@ private struct ModifierKeyButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(modifier.symbol)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .frame(width: 26, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.secondary.opacity(0.10))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: 1)
-                )
+            ShortcutKeycapView(label: modifier.symbol, isSelected: isSelected)
         }
         .buttonStyle(.plain)
         .help(modifier.title)
@@ -273,18 +436,21 @@ private struct ShortcutListRow: View {
     let shortcut: String
     let title: String
     var isEmpty = false
+    var isDisabled = false
 
     var body: some View {
-        HStack(spacing: 7) {
-            Text(shortcut)
-                .font(.system(.body, design: .monospaced))
-                .frame(width: 72, alignment: .leading)
+        HStack(spacing: 8) {
+            ShortcutKeycapGroupView(shortcut: shortcut, isDisabled: isEmpty || isDisabled)
+                .frame(width: 80, alignment: .leading)
             Text(title)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .foregroundStyle(isEmpty ? .secondary : .primary)
+                .foregroundStyle(isEmpty || isDisabled ? .secondary : .primary)
         }
+        .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(isEmpty ? 0.025 : 0.045), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .opacity(isDisabled ? 0.62 : 1)
     }
 }
 
@@ -295,36 +461,36 @@ private struct ManualShortcutRow: View {
     let remove: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(shortcut.name)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer()
-                Toggle("", isOn: Binding(
-                    get: { shortcut.isEnabled },
-                    set: setEnabled
-                ))
-                .labelsHidden()
-                .disabled(shortcut.shortcutTitle == nil)
-            }
+        HStack(alignment: .center, spacing: 10) {
+            Text(shortcut.name)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack {
-                Text(shortcut.shortcutTitle ?? "Not set")
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(shortcut.shortcutTitle == nil ? .secondary : .primary)
-                Spacer()
-                Button("Record") {
-                    record()
-                }
-                Button(role: .destructive) {
-                    remove()
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
+            Button {
+                record()
+            } label: {
+                ShortcutKeycapGroupView(shortcut: shortcut.shortcutTitle, isDisabled: !shortcut.isEnabled)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Record shortcut for \(shortcut.name)")
+            .help("Record shortcut")
+
+            Toggle("", isOn: Binding(
+                get: { shortcut.isEnabled },
+                set: setEnabled
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .disabled(shortcut.shortcutTitle == nil)
+
+            Button(role: .destructive) {
+                remove()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }

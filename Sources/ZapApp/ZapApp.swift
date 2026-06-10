@@ -24,13 +24,12 @@ struct ZapApp: App {
                 model: model,
                 updateService: updateService,
                 openSettings: { openSettings() },
-                openAbout: { openAbout() },
                 quit: { NSApp.terminate(nil) }
             )
         } label: {
             menuBarIcon
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings...") {
@@ -65,17 +64,15 @@ struct ZapApp: App {
         }
     }
 
-    private func openSettings() {
+    private func openSettings(initialMode: SettingsMode? = nil) {
         SettingsWindowPresenter.open(
             model: model,
             updateService: updateService,
-            showMenuBarIcon: $showMenuBarIcon
+            showMenuBarIcon: $showMenuBarIcon,
+            initialMode: initialMode
         )
     }
 
-    private func openAbout() {
-        AboutWindowPresenter.open()
-    }
 
     static func startUpdateServiceOnAppLaunch(_ updateService: UpdateService) {
         Task { @MainActor in

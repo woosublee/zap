@@ -18,6 +18,23 @@ final class WindowManagementModelTests: XCTestCase {
         XCTAssertEqual(model.windowShortcutsForRegistration, [])
     }
 
+    func testShortcutRecordingTemporarilyExcludesWindowHotkeysFromRegistration() {
+        let model = makeModel()
+
+        XCTAssertFalse(model.windowShortcutsForRegistration.isEmpty)
+
+        model.setShortcutRecordingActive(true)
+
+        XCTAssertTrue(model.isShortcutRecordingActive)
+        XCTAssertFalse(model.windowShortcuts.isEmpty)
+        XCTAssertEqual(model.windowShortcutsForRegistration, [])
+
+        model.setShortcutRecordingActive(false)
+
+        XCTAssertFalse(model.isShortcutRecordingActive)
+        XCTAssertFalse(model.windowShortcutsForRegistration.isEmpty)
+    }
+
     func testDisablingSingleWindowShortcutKeepsPresentationAndExcludesOnlyThatAction() throws {
         let model = makeModel()
 
@@ -84,6 +101,21 @@ final class WindowManagementModelTests: XCTestCase {
 
         XCTAssertEqual(service.performedActions, [.center])
         XCTAssertEqual(model.windowManagementError, "focusedWindowMissing")
+    }
+
+    func testSetShortcutClearsStaleSheetWindowErrorFromRecorderAttempt() throws {
+        let service = FakeWindowActionPerformer(result: .failure(.unsupportedWindow(.sheetOrSystemDialog)))
+        let model = makeModel(service: service)
+
+        _ = model.perform(action: .center)
+        XCTAssertNotNil(model.windowManagementError)
+
+        model.setShortcut(action: .center, keyCode: 0, keyDisplayName: "ㅁ", modifiers: [.control])
+
+        let center = try XCTUnwrap(model.windowShortcuts.first { $0.action == .center })
+        XCTAssertEqual(center.shortcutTitle, "⌃ㅁ")
+        XCTAssertNil(model.windowManagementError)
+        XCTAssertTrue(model.windowShortcutsForRegistration.contains { $0.action == .center })
     }
 
     func testWindowManagementEnabledIsPersistedInIsolatedUserDefaultsSuite() throws {

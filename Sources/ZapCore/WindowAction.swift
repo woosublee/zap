@@ -1,4 +1,4 @@
-public enum WindowActionCategory: String, Codable, Equatable, Sendable {
+public enum WindowActionCategory: String, CaseIterable, Codable, Equatable, Sendable {
     case positioning
     case display
     case sizing

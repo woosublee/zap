@@ -418,7 +418,7 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
             hotKey.keyCode,
             hotKey.modifiers,
             hotKeyID,
-            GetApplicationEventTarget(),
+            GetEventDispatcherTarget(),
             0,
             &ref
         )

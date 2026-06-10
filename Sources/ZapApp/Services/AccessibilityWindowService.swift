@@ -38,6 +38,7 @@ struct AccessibilityWindow {
 }
 
 enum AccessibilityWindowError: Error, Equatable {
+    case accessibilityAPIDisabled
     case frontmostApplicationMissing
     case focusedWindowMissing
     case frameReadFailed(attribute: String)
@@ -45,12 +46,15 @@ enum AccessibilityWindowError: Error, Equatable {
 }
 
 enum AXUIElementClientError: Error, Equatable {
+    case apiDisabled
     case cannotComplete
     case failure
     case invalidValue
 
     init(_ error: AXError) {
         switch error {
+        case .apiDisabled:
+            self = .apiDisabled
         case .cannotComplete:
             self = .cannotComplete
         case .success:
@@ -101,6 +105,8 @@ struct AccessibilityWindowService: AccessibilityWindowControlling {
         let windowElement: AccessibilityElement
         do {
             windowElement = try client.copyElementAttribute(AXAttribute.focusedWindow, of: appElement)
+        } catch AXUIElementClientError.apiDisabled {
+            throw AccessibilityWindowError.accessibilityAPIDisabled
         } catch {
             throw AccessibilityWindowError.focusedWindowMissing
         }
@@ -144,39 +150,27 @@ struct AccessibilityWindowService: AccessibilityWindowControlling {
     }
 
     private func appKitFrame(fromAXFrame frame: CGRect) -> CGRect {
-        let screen = screenContainingTopLeft(of: frame) ?? screenContainingBottomLeft(of: frame)
-        guard let screen else { return frame }
+        guard let screenReferenceTopY else { return frame }
         return CGRect(
             x: frame.minX,
-            y: screen.frame.maxY - frame.minY - frame.height,
+            y: screenReferenceTopY - frame.minY - frame.height,
             width: frame.width,
             height: frame.height
         )
     }
 
     private func axFrame(fromAppKitFrame frame: CGRect) -> CGRect {
-        let screen = screenContainingBottomLeft(of: frame) ?? screenContainingTopLeft(of: frame)
-        guard let screen else { return frame }
+        guard let screenReferenceTopY else { return frame }
         return CGRect(
             x: frame.minX,
-            y: screen.frame.maxY - frame.minY - frame.height,
+            y: screenReferenceTopY - frame.minY - frame.height,
             width: frame.width,
             height: frame.height
         )
     }
 
-    private func screenContainingTopLeft(of frame: CGRect) -> DisplayFrame? {
-        screen(containing: frame.origin)
-    }
-
-    private func screenContainingBottomLeft(of frame: CGRect) -> DisplayFrame? {
-        screen(containing: CGPoint(x: frame.minX, y: frame.minY))
-    }
-
-    private func screen(containing point: CGPoint) -> DisplayFrame? {
-        screens.displayFrames.first { display in
-            display.frame.contains(point) || display.visibleFrame.contains(point)
-        } ?? screens.displayFrames.first(where: \.isMain) ?? screens.displayFrames.first
+    private var screenReferenceTopY: CGFloat? {
+        screens.displayFrames.first?.frame.maxY
     }
 
     private func writeSize(_ size: CGSize, to element: AccessibilityElement) throws {

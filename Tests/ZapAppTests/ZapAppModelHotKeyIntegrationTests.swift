@@ -160,6 +160,23 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(hotKeyService.registrations[0].windowShortcuts.first { $0.action == .leftHalf }?.keyCode, 124)
     }
 
+    func testStartingWindowShortcutRecordingReregistersWithoutWindowShortcuts() {
+        let initialShortcuts = [windowShortcut(.center, keyCode: 0, modifiers: [.control])]
+        let windowModel = WindowManagementModel(
+            service: CapturingWindowManagementPerformer(),
+            shortcutStore: InMemoryWindowShortcutStore(shortcuts: initialShortcuts)
+        )
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(windowManagementModel: windowModel, hotKeyService: hotKeyService)
+        hotKeyService.registrations.removeAll()
+
+        windowModel.setShortcutRecordingActive(true)
+
+        _ = model
+        XCTAssertEqual(hotKeyService.registrations.count, 1)
+        XCTAssertEqual(hotKeyService.registrations[0].windowShortcuts, [])
+    }
+
     func testHotKeyRegistrationErrorAndWindowShortcutValidationErrorRemainSeparate() {
         let windowModel = WindowManagementModel(
             service: CapturingWindowManagementPerformer(),
