@@ -14,7 +14,8 @@ final class SettingsWindowManagementUITests: XCTestCase {
             "Automatic",
             "Manual",
             "Window Management",
-            "Setting"
+            "Setting",
+            "About"
         ])
     }
 
@@ -23,9 +24,32 @@ final class SettingsWindowManagementUITests: XCTestCase {
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
         XCTAssertTrue(source.contains("sidebarSection(title: \"Shortcuts\", modes: [.automatic, .manual, .windowManagement])"))
-        XCTAssertTrue(source.contains("sidebarSection(title: \"System\", modes: [.setting])"))
+        XCTAssertTrue(source.contains("sidebarSection(title: \"System\", modes: [.setting, .about])"))
         XCTAssertTrue(source.contains("case .setting:"))
+        XCTAssertTrue(source.contains("case .about:"))
         XCTAssertTrue(source.contains("settingSection"))
+        XCTAssertTrue(source.contains("aboutSection"))
+    }
+
+    func testSettingsAboutModeRendersExistingAboutViewWithoutExtraCardWrapper() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains("case .about:"))
+        XCTAssertTrue(source.contains("aboutSection"))
+        XCTAssertTrue(source.contains("AboutView(presentation: AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current))"))
+        XCTAssertFalse(source.contains("SettingsCard(title: AboutPresentation.aboutMenuLabel(appName: AboutPresentation.currentAppName))"))
+        XCTAssertTrue(source.contains("case .about: \"About\""))
+        XCTAssertTrue(source.contains("case .about: \"info.circle\""))
+    }
+
+    func testSettingsContentDoesNotRenderPerModeHeader() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertFalse(source.contains("settingsHeader"))
+        XCTAssertFalse(source.contains("Text(selectedMode.title)"))
+        XCTAssertFalse(source.contains("selectedMode.subtitle"))
     }
 
     func testSettingsViewRoutesWindowManagementModeAndKeepsExistingModes() throws {
@@ -64,14 +88,11 @@ final class SettingsWindowManagementUITests: XCTestCase {
             .appendingPathComponent("Sources/ZapApp/Services/SettingsWindowPresenter.swift"))
         let settingsSource = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-        let appSource = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/ZapApp.swift"))
 
         XCTAssertTrue(settingsSource.contains("initialMode: SettingsMode = .automatic"))
         XCTAssertTrue(settingsSource.contains("_selectedMode = State(initialValue: initialMode)"))
         XCTAssertTrue(presenterSource.contains("initialMode: SettingsMode = .automatic"))
         XCTAssertTrue(presenterSource.contains("initialMode: initialMode"))
-        XCTAssertTrue(appSource.contains("openSettings(initialMode: .windowManagement)"))
     }
 
     func testSettingsSidebarAnnouncesSelectedModeForAccessibility() throws {

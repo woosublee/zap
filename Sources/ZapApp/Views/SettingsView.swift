@@ -30,8 +30,6 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: ZapSpacing.large) {
-                    settingsHeader
-
                     switch selectedMode {
                     case .automatic:
                         automaticShortcutsSection
@@ -46,6 +44,8 @@ struct SettingsView: View {
                         )
                     case .setting:
                         settingSection
+                    case .about:
+                        aboutSection
                     }
                 }
                 .padding(22)
@@ -93,7 +93,7 @@ struct SettingsView: View {
 
             sidebarSection(title: "Shortcuts", modes: [.automatic, .manual, .windowManagement])
 
-            sidebarSection(title: "System", modes: [.setting])
+            sidebarSection(title: "System", modes: [.setting, .about])
                 .padding(.top, 10)
 
             Spacer()
@@ -123,16 +123,6 @@ struct SettingsView: View {
         }
     }
 
-    private var settingsHeader: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(selectedMode.title)
-                .font(.system(size: 24, weight: .semibold))
-            Text(selectedMode.subtitle)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private var menuBarIconBinding: Binding<Bool> {
         Binding(
             get: { showMenuBarIcon },
@@ -149,6 +139,15 @@ struct SettingsView: View {
             behaviorSection
             updatesSection
         }
+    }
+
+    private var aboutSection: some View {
+        HStack {
+            Spacer(minLength: 0)
+            AboutView(presentation: AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current))
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var permissionsSection: some View {
@@ -337,6 +336,7 @@ enum SettingsMode: String, CaseIterable, Identifiable {
     case manual
     case windowManagement
     case setting
+    case about
 
     var id: String { rawValue }
 
@@ -346,15 +346,7 @@ enum SettingsMode: String, CaseIterable, Identifiable {
         case .manual: "Manual"
         case .windowManagement: "Window Management"
         case .setting: "Setting"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .automatic: "Launch Dock apps and Finder with predictable number shortcuts."
-        case .manual: "Assign specific global shortcuts to apps outside the Dock."
-        case .windowManagement: "Move and resize the frontmost window with Spectacle-style shortcuts."
-        case .setting: "Manage app behavior, permissions, and updates."
+        case .about: "About"
         }
     }
 
@@ -364,6 +356,7 @@ enum SettingsMode: String, CaseIterable, Identifiable {
         case .manual: "keyboard"
         case .windowManagement: "rectangle.3.group"
         case .setting: "gearshape"
+        case .about: "info.circle"
         }
     }
 }
