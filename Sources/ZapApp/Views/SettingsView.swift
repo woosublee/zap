@@ -71,6 +71,16 @@ struct SettingsView: View {
                 }
             )
         }
+        .onAppear {
+            refreshAccessibilityPermission()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshAccessibilityPermission()
+        }
+    }
+
+    private func refreshAccessibilityPermission() {
+        model.windowManagementModel.refreshAccessibilityPermission()
     }
 
     private var settingsSidebar: some View {
@@ -169,6 +179,7 @@ struct SettingsView: View {
                     } else {
                         Button("Request") {
                             model.windowManagementModel.requestAccessibilityPermission()
+                            refreshAccessibilityPermission()
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
