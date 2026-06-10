@@ -115,6 +115,25 @@ final class GlobalHotKeyRegistrationPlanTests: XCTestCase {
         }, [2003])
     }
 
+    func testWindowShortcutWithEmptyDisplayNameIsSkipped() {
+        let plan = planner.plan(
+            modifiers: [.option],
+            finderShortcutEnabled: false,
+            manualShortcuts: [],
+            windowShortcuts: [
+                windowShortcut(.center, keyCode: 8, keyDisplayName: "", modifiers: [.option, .command]),
+                windowShortcut(.rightHalf, keyCode: 124, modifiers: [.control, .option])
+            ]
+        )
+
+        let windowActions = plan.hotKeys.compactMap { hotKey -> WindowAction? in
+            guard case let .window(action, _) = hotKey.owner else { return nil }
+            return action
+        }
+
+        XCTAssertEqual(windowActions, [.rightHalf])
+    }
+
     func testDuplicateComboAcrossDomainsUsesOneSharedComboSet() {
         let manualID = UUID(uuidString: "00000000-0000-0000-0000-000000000010")!
         let plan = planner.plan(
@@ -213,13 +232,14 @@ final class GlobalHotKeyRegistrationPlanTests: XCTestCase {
     private func windowShortcut(
         _ action: WindowAction,
         keyCode: UInt32?,
+        keyDisplayName: String? = nil,
         modifiers: Set<ShortcutModifier>,
         isEnabled: Bool = true
     ) -> WindowShortcut {
         WindowShortcut(
             action: action,
             keyCode: keyCode,
-            keyDisplayName: action.displayName,
+            keyDisplayName: keyDisplayName ?? action.displayName,
             modifiers: modifiers,
             isEnabled: isEnabled
         )

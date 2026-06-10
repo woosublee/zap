@@ -134,6 +134,10 @@ struct WindowManagementService {
             return fail(.frameReadFailed)
         }
 
+        guard !actualFrame.equalTo(currentFrame) else {
+            return fail(.setFrameFailed)
+        }
+
         history.recordSuccessfulMove(
             applicationIdentifier: window.applicationIdentifier,
             previousFrame: currentFrame,

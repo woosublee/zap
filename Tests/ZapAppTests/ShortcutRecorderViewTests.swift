@@ -26,7 +26,7 @@ final class ShortcutRecorderViewTests: XCTestCase {
         XCTAssertTrue(source.contains("ShortcutRecorderView"))
         XCTAssertTrue(source.contains("Record"))
         XCTAssertTrue(source.contains("Disable"))
-        XCTAssertTrue(source.contains("Toggle"))
+        XCTAssertTrue(source.contains("Toggle(\"\", isOn: Binding("))
         XCTAssertTrue(source.contains("setEnabled"))
         XCTAssertTrue(source.contains("shortcut.shortcutTitle ?? \"Not set\""))
     }

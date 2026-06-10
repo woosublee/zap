@@ -73,7 +73,9 @@ final class SettingsWindowManagementUITests: XCTestCase {
         let windowManagementSource = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
 
-        XCTAssertTrue(settingsSource.contains("WindowManagementSettingsView(model: model.windowManagementModel, registrationError: model.registrationError)"))
+        XCTAssertTrue(settingsSource.contains("WindowManagementSettingsView("))
+        XCTAssertTrue(settingsSource.contains("model: model.windowManagementModel"))
+        XCTAssertTrue(settingsSource.contains("registrationError: model.registrationError"))
         XCTAssertTrue(windowManagementSource.contains("let registrationError: String?"))
         XCTAssertTrue(windowManagementSource.contains("if let registrationError"))
         XCTAssertTrue(windowManagementSource.contains("Text(registrationError)"))

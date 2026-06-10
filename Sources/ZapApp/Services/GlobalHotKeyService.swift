@@ -183,9 +183,8 @@ struct GlobalHotKeyRegistrationPlanner {
         var failures: [String] = []
 
         for (index, shortcut) in shortcuts.enumerated() {
-            guard shortcut.isEnabled,
-                  let keyCode = shortcut.keyCode,
-                  !shortcut.modifiers.isEmpty else {
+            guard shortcut.canRegister,
+                  let keyCode = shortcut.keyCode else {
                 continue
             }
 

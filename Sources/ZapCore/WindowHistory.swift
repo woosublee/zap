@@ -11,6 +11,7 @@ public struct WindowHistoryItem: Equatable, Sendable {
 }
 
 public struct WindowHistory: Equatable, Sendable {
+    private let maximumUndoCount = 50
     private var undoStacks: [String: [WindowHistoryItem]]
     private var redoStacks: [String: [WindowHistoryItem]]
 
@@ -31,6 +32,9 @@ public struct WindowHistory: Equatable, Sendable {
         let item = WindowHistoryItem(applicationIdentifier: applicationIdentifier, windowFrame: frame)
         if undoStacks[applicationIdentifier]?.last != item {
             undoStacks[applicationIdentifier, default: []].append(item)
+            if undoStacks[applicationIdentifier, default: []].count > maximumUndoCount {
+                undoStacks[applicationIdentifier]?.removeFirst()
+            }
         }
         redoStacks[applicationIdentifier] = []
     }

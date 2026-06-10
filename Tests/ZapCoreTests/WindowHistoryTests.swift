@@ -76,4 +76,20 @@ final class WindowHistoryTests: XCTestCase {
 
         XCTAssertFalse(history.canUndo(applicationIdentifier: "com.example.Terminal"))
     }
+
+    func testUndoStackKeepsMostRecentFiftyEntriesPerApplicationLikeSpectacle() {
+        var history = WindowHistory()
+        let app = "com.example.Terminal"
+        for index in 0..<51 {
+            history.record(applicationIdentifier: app, frame: CGRect(x: index, y: 0, width: 100, height: 100))
+        }
+
+        var undoFrames: [CGRect] = []
+        while let item = history.undo(applicationIdentifier: app, currentFrame: .zero) {
+            undoFrames.append(item.windowFrame)
+        }
+
+        XCTAssertEqual(undoFrames.count, 50)
+        XCTAssertEqual(undoFrames.last, CGRect(x: 1, y: 0, width: 100, height: 100))
+    }
 }

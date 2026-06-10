@@ -134,6 +134,26 @@ final class WindowManagementServiceTests: XCTestCase {
         ])
     }
 
+    func testPerformFailsAndDoesNotRecordWhenActualFrameDoesNotMoveAfterSetFrame() {
+        let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
+        let originalFrame = CGRect(x: 100, y: 100, width: 500, height: 400)
+        let requestedFrame = CGRect(x: 0, y: 25, width: 720, height: 875)
+        let windows = MockAccessibilityWindows(frontmostWindow: window)
+        windows.frameResults = [.success(originalFrame), .success(originalFrame)]
+        let calculator = MockWindowPositionCalculator(result: WindowCalculationResult(frame: requestedFrame, resolvedAction: .leftHalf))
+        let history = MockWindowHistoryRecorder()
+        let feedback = MockFailureFeedback()
+        let service = makeService(windows: windows, calculator: calculator, history: history, feedback: feedback)
+
+        let result = service.perform(action: .leftHalf)
+
+        XCTAssertEqual(result, .failure(.setFrameFailed))
+        XCTAssertEqual(feedback.failureCount, 1)
+        XCTAssertEqual(windows.capturedSetFrames, [requestedFrame])
+        XCTAssertEqual(windows.frameCallCount, 2)
+        XCTAssertEqual(history.records.count, 0)
+    }
+
     func testPerformFailsAndDoesNotRecordWhenActualFrameCannotBeReadAfterSetFrame() {
         let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
         let originalFrame = CGRect(x: 100, y: 100, width: 500, height: 400)

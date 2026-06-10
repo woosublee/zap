@@ -87,6 +87,59 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         _ = model
     }
 
+    func testHotKeyCallbacksHopToMainActorWhenInvokedOffMainActor() async {
+        let dockItem = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let manualID = UUID(uuidString: "00000000-0000-0000-0000-000000000303")!
+        let manual = manualShortcut(
+            id: manualID,
+            name: "Notes",
+            url: URL(fileURLWithPath: "/Applications/Notes.app"),
+            bundleIdentifier: "com.apple.Notes",
+            keyCode: 45,
+            modifiers: [.control, .option]
+        )
+        storeManualShortcuts([manual])
+        let callbacksComplete = expectation(description: "Hotkey callbacks complete")
+        callbacksComplete.expectedFulfillmentCount = 4
+        let launcher = CapturingAppLauncher()
+        launcher.onActivateOrLaunch = { callbacksComplete.fulfill() }
+        launcher.onActivateFinder = { callbacksComplete.fulfill() }
+        let windowPerformer = CapturingWindowManagementPerformer()
+        windowPerformer.onPerform = { callbacksComplete.fulfill() }
+        let windowModel = WindowManagementModel(
+            service: windowPerformer,
+            shortcutStore: InMemoryWindowShortcutStore(shortcuts: [windowShortcut(.leftHalf, keyCode: 123, modifiers: [.option, .command])])
+        )
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [dockItem],
+            appLauncher: launcher,
+            windowManagementModel: windowModel,
+            hotKeyService: hotKeyService
+        )
+        let callbacks = hotKeyService.callbacks
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                callbacks.onDockHotKey?(.one)
+                callbacks.onFinderHotKey?()
+                callbacks.onManualHotKey?(manualID)
+                callbacks.onWindowHotKey?(.leftHalf)
+                continuation.resume()
+            }
+        }
+        await fulfillment(of: [callbacksComplete], timeout: 1.0)
+
+        XCTAssertEqual(launcher.activatedItems, [dockItem, manual.dockItem])
+        XCTAssertEqual(launcher.activateFinderCallCount, 1)
+        XCTAssertEqual(windowPerformer.performedActions, [.leftHalf])
+        _ = model
+    }
+
     func testUpdatingWindowShortcutSavesAndReregistersWithNewWindowShortcuts() {
         let initialShortcuts = [windowShortcut(.leftHalf, keyCode: 123, modifiers: [.option, .command])]
         let shortcutStore = InMemoryWindowShortcutStore(shortcuts: initialShortcuts)
@@ -198,6 +251,13 @@ private final class CapturingHotKeyService: GlobalHotKeyServicing {
         let windowShortcuts: [WindowShortcut]
     }
 
+    struct Callbacks: @unchecked Sendable {
+        let onDockHotKey: ((NumberKey) -> Void)?
+        let onFinderHotKey: (() -> Void)?
+        let onManualHotKey: ((UUID) -> Void)?
+        let onWindowHotKey: ((WindowAction) -> Void)?
+    }
+
     var registrations: [Registration] = []
     var unregisterCallCount = 0
     var nextRegistrationError: String?
@@ -205,6 +265,15 @@ private final class CapturingHotKeyService: GlobalHotKeyServicing {
     var onFinderHotKey: (() -> Void)?
     var onManualHotKey: ((UUID) -> Void)?
     var onWindowHotKey: ((WindowAction) -> Void)?
+
+    var callbacks: Callbacks {
+        Callbacks(
+            onDockHotKey: onDockHotKey,
+            onFinderHotKey: onFinderHotKey,
+            onManualHotKey: onManualHotKey,
+            onWindowHotKey: onWindowHotKey
+        )
+    }
 
     func register(
         modifiers: Set<ShortcutModifier>,
@@ -228,9 +297,11 @@ private final class CapturingHotKeyService: GlobalHotKeyServicing {
 
 private final class CapturingWindowManagementPerformer: WindowActionPerforming {
     var performedActions: [WindowAction] = []
+    var onPerform: (() -> Void)?
 
     func perform(action: WindowAction) -> WindowManagementResult {
         performedActions.append(action)
+        onPerform?()
         return .success(action: action, frame: .zero)
     }
 }
@@ -263,13 +334,17 @@ private struct StubDockItemProvider: DockItemProviding {
 private final class CapturingAppLauncher: AppLaunching {
     var activatedItems: [DockItem] = []
     var activateFinderCallCount = 0
+    var onActivateOrLaunch: (() -> Void)?
+    var onActivateFinder: (() -> Void)?
 
     func activateOrLaunch(_ item: DockItem) {
         activatedItems.append(item)
+        onActivateOrLaunch?()
     }
 
     func activateFinder() {
         activateFinderCallCount += 1
+        onActivateFinder?()
     }
 }
 

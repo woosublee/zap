@@ -54,22 +54,22 @@ final class ZapAppModel: ObservableObject {
     ) -> any GlobalHotKeyServicing
     private lazy var hotKeyService: any GlobalHotKeyServicing = hotKeyServiceFactory(
         { [weak self] key in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.activateDockItem(for: key)
             }
         },
         { [weak self] in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.activateFinder()
             }
         },
         { [weak self] id in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.activateManualShortcut(id: id)
             }
         },
         { [weak self] action in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 _ = self?.windowManagementModel.perform(action: action)
             }
         }

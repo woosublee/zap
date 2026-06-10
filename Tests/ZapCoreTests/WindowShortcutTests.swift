@@ -30,16 +30,20 @@ final class WindowShortcutTests: XCTestCase {
     func testDisabledOrIncompleteShortcutCannotRegisterAndDisplaysOff() {
         let disabled = WindowShortcut(action: .center, keyCode: 8, keyDisplayName: "C", modifiers: [.option], isEnabled: false)
         let missingKey = WindowShortcut(action: .center, keyCode: nil, keyDisplayName: nil, modifiers: [.option], isEnabled: true)
+        let missingDisplayName = WindowShortcut(action: .center, keyCode: 8, keyDisplayName: "", modifiers: [.option], isEnabled: true)
         let missingModifiers = WindowShortcut(action: .center, keyCode: 8, keyDisplayName: "C", modifiers: [], isEnabled: true)
 
         XCTAssertFalse(disabled.canRegister)
         XCTAssertFalse(missingKey.canRegister)
+        XCTAssertFalse(missingDisplayName.canRegister)
         XCTAssertFalse(missingModifiers.canRegister)
         XCTAssertEqual(disabled.shortcutTitle, "⌥C")
         XCTAssertNil(missingKey.shortcutTitle)
+        XCTAssertNil(missingDisplayName.shortcutTitle)
         XCTAssertNil(missingModifiers.shortcutTitle)
         XCTAssertEqual(disabled.displayText, "Off")
         XCTAssertEqual(missingKey.displayText, "Off")
+        XCTAssertEqual(missingDisplayName.displayText, "Off")
         XCTAssertEqual(missingModifiers.displayText, "Off")
     }
 

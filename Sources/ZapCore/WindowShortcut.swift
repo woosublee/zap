@@ -22,11 +22,11 @@ public struct WindowShortcut: Codable, Equatable, Identifiable, Sendable {
     }
 
     public var canRegister: Bool {
-        isEnabled && keyCode != nil && !modifiers.isEmpty
+        isEnabled && shortcutTitle != nil
     }
 
     public var shortcutTitle: String? {
-        guard keyCode != nil, let keyDisplayName, !modifiers.isEmpty else { return nil }
+        guard keyCode != nil, let keyDisplayName, !keyDisplayName.isEmpty, !modifiers.isEmpty else { return nil }
         let modifierSymbols = modifiers
             .sorted { $0.windowShortcutDisplayOrder < $1.windowShortcutDisplayOrder }
             .map(\.symbol)
