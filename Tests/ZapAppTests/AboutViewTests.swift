@@ -8,16 +8,17 @@ final class AboutViewTests: XCTestCase {
             .deletingLastPathComponent()
     }
 
-    func testAboutViewKeepsContentAndUsesRefinedNativeCardStyling() throws {
+    func testAboutViewKeepsContentWithoutVisibleContainerStyling() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/AboutView.swift"))
 
         XCTAssertTrue(source.contains("presentation.appName"))
         XCTAssertTrue(source.contains("presentation.versionLine"))
         XCTAssertTrue(source.contains("presentation.creatorLine"))
-        XCTAssertTrue(source.contains(".regularMaterial"))
-        XCTAssertTrue(source.contains("RoundedRectangle(cornerRadius: 18"))
         XCTAssertTrue(source.contains("foregroundStyle(.tint)"))
+        XCTAssertFalse(source.contains(".regularMaterial"))
+        XCTAssertFalse(source.contains("RoundedRectangle(cornerRadius: 18"))
+        XCTAssertFalse(source.contains("strokeBorder"))
     }
 
     func testAboutWindowPresenterMatchesRedesignedAboutViewWidth() throws {

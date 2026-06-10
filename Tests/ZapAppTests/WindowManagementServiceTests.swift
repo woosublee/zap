@@ -134,24 +134,34 @@ final class WindowManagementServiceTests: XCTestCase {
         ])
     }
 
-    func testPerformFailsAndDoesNotRecordWhenActualFrameDoesNotMoveAfterSetFrame() {
+    func testPerformUsesBestEffortFrameWhenInitialSetFrameDoesNotMoveWindow() {
         let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
-        let originalFrame = CGRect(x: 100, y: 100, width: 500, height: 400)
-        let requestedFrame = CGRect(x: 0, y: 25, width: 720, height: 875)
+        let originalFrame = CGRect(x: -1280, y: 0, width: 1280, height: 1410)
+        let requestedFrame = CGRect(x: -2560, y: 0, width: 853, height: 1440)
+        let bestEffortFrame = CGRect(x: -2560, y: 0, width: 1280, height: 1410)
         let windows = MockAccessibilityWindows(frontmostWindow: window)
-        windows.frameResults = [.success(originalFrame), .success(originalFrame)]
+        windows.frameResults = [.success(originalFrame), .success(originalFrame), .success(bestEffortFrame)]
+        let screens = MockScreenProvider(displayFrames: [
+            DisplayFrame(
+                frame: CGRect(x: -2560, y: 0, width: 2560, height: 1440),
+                visibleFrame: CGRect(x: -2560, y: 0, width: 2560, height: 1440),
+                isMain: false
+            )
+        ])
         let calculator = MockWindowPositionCalculator(result: WindowCalculationResult(frame: requestedFrame, resolvedAction: .leftHalf))
         let history = MockWindowHistoryRecorder()
         let feedback = MockFailureFeedback()
-        let service = makeService(windows: windows, calculator: calculator, history: history, feedback: feedback)
+        let service = makeService(windows: windows, screens: screens, calculator: calculator, history: history, feedback: feedback)
 
         let result = service.perform(action: .leftHalf)
 
-        XCTAssertEqual(result, .failure(.setFrameFailed))
-        XCTAssertEqual(feedback.failureCount, 1)
-        XCTAssertEqual(windows.capturedSetFrames, [requestedFrame])
-        XCTAssertEqual(windows.frameCallCount, 2)
-        XCTAssertEqual(history.records.count, 0)
+        XCTAssertEqual(result, .success(action: .leftHalf, frame: bestEffortFrame))
+        XCTAssertEqual(feedback.failureCount, 0)
+        XCTAssertEqual(windows.capturedSetFrames, [requestedFrame, bestEffortFrame])
+        XCTAssertEqual(windows.frameCallCount, 3)
+        XCTAssertEqual(history.records, [
+            .init(applicationIdentifier: "com.example.App", previousFrame: originalFrame, targetFrame: bestEffortFrame)
+        ])
     }
 
     func testPerformFailsAndDoesNotRecordWhenActualFrameCannotBeReadAfterSetFrame() {
@@ -317,6 +327,26 @@ final class WindowManagementServiceTests: XCTestCase {
         let result = service.perform(action: .leftHalf)
 
         XCTAssertEqual(result, .failure(.focusedWindowMissing))
+        XCTAssertEqual(feedback.failureCount, 1)
+        XCTAssertEqual(calculator.calculateCallCount, 0)
+    }
+
+    func testPerformFailsWithAPIDisabledWhenTargetAppDisablesAccessibilityAPI() {
+        let windows = MockAccessibilityWindows()
+        windows.frontmostWindowHandler = {
+            throw AccessibilityWindowError.accessibilityAPIDisabled
+        }
+        let calculator = MockWindowPositionCalculator()
+        calculator.calculateHandler = { _ in
+            XCTFail("Calculation must not run when the target app disables its accessibility API.")
+            return nil
+        }
+        let feedback = MockFailureFeedback()
+        let service = makeService(windows: windows, calculator: calculator, feedback: feedback)
+
+        let result = service.perform(action: .leftHalf)
+
+        XCTAssertEqual(result, .failure(.accessibilityAPIDisabled))
         XCTAssertEqual(feedback.failureCount, 1)
         XCTAssertEqual(calculator.calculateCallCount, 0)
     }

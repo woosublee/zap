@@ -102,6 +102,13 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("accessibilityValue(isSelected ? \"Selected\" : \"Not selected\")"))
     }
 
+    func testSettingsSidebarItemUsesFullRowHitArea() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains(".padding(.vertical, 8)\n            .frame(maxWidth: .infinity, alignment: .leading)\n            .contentShape(Rectangle())\n            .background("))
+    }
+
     func testGeneralSectionOwnsPermissionsBehaviorAndUpdates() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))

@@ -380,6 +380,8 @@ private struct SettingsSidebarItem: View {
             .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.clear)

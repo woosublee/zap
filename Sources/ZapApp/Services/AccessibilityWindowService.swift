@@ -38,6 +38,7 @@ struct AccessibilityWindow {
 }
 
 enum AccessibilityWindowError: Error, Equatable {
+    case accessibilityAPIDisabled
     case frontmostApplicationMissing
     case focusedWindowMissing
     case frameReadFailed(attribute: String)
@@ -45,12 +46,15 @@ enum AccessibilityWindowError: Error, Equatable {
 }
 
 enum AXUIElementClientError: Error, Equatable {
+    case apiDisabled
     case cannotComplete
     case failure
     case invalidValue
 
     init(_ error: AXError) {
         switch error {
+        case .apiDisabled:
+            self = .apiDisabled
         case .cannotComplete:
             self = .cannotComplete
         case .success:
@@ -101,6 +105,8 @@ struct AccessibilityWindowService: AccessibilityWindowControlling {
         let windowElement: AccessibilityElement
         do {
             windowElement = try client.copyElementAttribute(AXAttribute.focusedWindow, of: appElement)
+        } catch AXUIElementClientError.apiDisabled {
+            throw AccessibilityWindowError.accessibilityAPIDisabled
         } catch {
             throw AccessibilityWindowError.focusedWindowMissing
         }
@@ -164,7 +170,7 @@ struct AccessibilityWindowService: AccessibilityWindowControlling {
     }
 
     private var screenReferenceTopY: CGFloat? {
-        (screens.displayFrames.first(where: \.isMain) ?? screens.displayFrames.first)?.frame.maxY
+        screens.displayFrames.first?.frame.maxY
     }
 
     private func screenContainingTopLeft(of frame: CGRect) -> DisplayFrame? {

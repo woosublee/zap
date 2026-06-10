@@ -25,10 +25,5 @@ struct AboutView: View {
         }
         .padding(28)
         .frame(width: 292)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
     }
 }

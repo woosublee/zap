@@ -206,6 +206,17 @@ final class GlobalHotKeyRegistrationPlanTests: XCTestCase {
         XCTAssertEqual(plan.errors.filter { $0.contains("(conflict)") }, ["Some window shortcuts could not be registered: Left Half (conflict)"])
     }
 
+    func testCarbonHotKeyRegistrationUsesEventDispatcherTargetLikeSpectacle() throws {
+        let packageRootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Services/GlobalHotKeyService.swift"))
+
+        XCTAssertTrue(source.contains("RegisterEventHotKey(\n            hotKey.keyCode,\n            hotKey.modifiers,\n            hotKeyID,\n            GetEventDispatcherTarget(),"))
+    }
+
     private var planner: GlobalHotKeyRegistrationPlanner {
         GlobalHotKeyRegistrationPlanner()
     }
