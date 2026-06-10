@@ -144,25 +144,27 @@ struct AccessibilityWindowService: AccessibilityWindowControlling {
     }
 
     private func appKitFrame(fromAXFrame frame: CGRect) -> CGRect {
-        let screen = screenContainingTopLeft(of: frame) ?? screenContainingBottomLeft(of: frame)
-        guard let screen else { return frame }
+        guard let screenReferenceTopY else { return frame }
         return CGRect(
             x: frame.minX,
-            y: screen.frame.maxY - frame.minY - frame.height,
+            y: screenReferenceTopY - frame.minY - frame.height,
             width: frame.width,
             height: frame.height
         )
     }
 
     private func axFrame(fromAppKitFrame frame: CGRect) -> CGRect {
-        let screen = screenContainingBottomLeft(of: frame) ?? screenContainingTopLeft(of: frame)
-        guard let screen else { return frame }
+        guard let screenReferenceTopY else { return frame }
         return CGRect(
             x: frame.minX,
-            y: screen.frame.maxY - frame.minY - frame.height,
+            y: screenReferenceTopY - frame.minY - frame.height,
             width: frame.width,
             height: frame.height
         )
+    }
+
+    private var screenReferenceTopY: CGFloat? {
+        (screens.displayFrames.first(where: \.isMain) ?? screens.displayFrames.first)?.frame.maxY
     }
 
     private func screenContainingTopLeft(of frame: CGRect) -> DisplayFrame? {

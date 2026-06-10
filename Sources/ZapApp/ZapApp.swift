@@ -24,6 +24,7 @@ struct ZapApp: App {
                 model: model,
                 updateService: updateService,
                 openSettings: { openSettings() },
+                openWindowManagementSettings: { openSettings(initialMode: .windowManagement) },
                 openAbout: { openAbout() },
                 quit: { NSApp.terminate(nil) }
             )
@@ -65,11 +66,12 @@ struct ZapApp: App {
         }
     }
 
-    private func openSettings() {
+    private func openSettings(initialMode: SettingsMode = .automatic) {
         SettingsWindowPresenter.open(
             model: model,
             updateService: updateService,
-            showMenuBarIcon: $showMenuBarIcon
+            showMenuBarIcon: $showMenuBarIcon,
+            initialMode: initialMode
         )
     }
 

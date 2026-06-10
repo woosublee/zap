@@ -32,30 +32,45 @@ struct ShortcutRecorderView: View {
     }
 
     @State private var errorMessage: String?
+    @State private var recordingPulse = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(title)
-                .font(.headline)
-            Text(instructions)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(.headline, design: .default, weight: .semibold))
+                Text(instructions)
+                    .foregroundStyle(.secondary)
+            }
 
             ShortcutCaptureView { event in
                 handle(event)
             }
-            .frame(height: 72)
+            .frame(height: 86)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.accentColor.opacity(0.55), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.accentColor.opacity(recordingPulse ? 0.70 : 0.28), lineWidth: 1)
             )
             .overlay {
-                Text(capturePrompt)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 9) {
+                    HStack(spacing: 5) {
+                        ShortcutKeycapView(label: "Modifier", isSelected: true)
+                        ShortcutKeycapView(label: capturePrompt)
+                    }
+                    Text("Press any modifier key plus a key. Esc cancels.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                    recordingPulse = true
+                }
             }
 
             if let errorMessage {
-                Text(errorMessage)
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -65,10 +80,11 @@ struct ShortcutRecorderView: View {
                 Button("Cancel") {
                     onCancel()
                 }
+                .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(20)
-        .frame(width: 380)
+        .padding(22)
+        .frame(width: 400)
     }
 
     private func handle(_ event: NSEvent) {
@@ -116,6 +132,8 @@ private struct ShortcutCaptureView: NSViewRepresentable {
 private final class KeyCaptureView: NSView {
     var onKeyDown: (NSEvent) -> Void
 
+    private var keyDownMonitor: Any?
+
     init(onKeyDown: @escaping (NSEvent) -> Void) {
         self.onKeyDown = onKeyDown
         super.init(frame: .zero)
@@ -125,10 +143,19 @@ private final class KeyCaptureView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        removeKeyDownMonitor()
+    }
+
     override var acceptsFirstResponder: Bool { true }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if window == nil {
+            removeKeyDownMonitor()
+            return
+        }
+        installKeyDownMonitor()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.window?.makeFirstResponder(self)
@@ -137,6 +164,22 @@ private final class KeyCaptureView: NSView {
 
     override func keyDown(with event: NSEvent) {
         onKeyDown(event)
+    }
+
+    private func installKeyDownMonitor() {
+        guard keyDownMonitor == nil else { return }
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            guard self.window != nil else { return event }
+            onKeyDown(event)
+            return nil
+        }
+    }
+
+    private func removeKeyDownMonitor() {
+        guard let monitor = keyDownMonitor else { return }
+        NSEvent.removeMonitor(monitor)
+        keyDownMonitor = nil
     }
 }
 

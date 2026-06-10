@@ -41,6 +41,16 @@ final class AccessibilityWindowServiceTests: XCTestCase {
         XCTAssertEqual(client.setOperations[2].sizeValue, CGSize(width: 1440, height: 437))
     }
 
+    func testSetFrameUsesTargetDisplayWhenWritingAuxiliaryDisplayFrame() throws {
+        let client = MockAXUIElementClient()
+        let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
+        let service = AccessibilityWindowService(client: client, screens: lowerAuxiliaryScreens())
+
+        try service.setFrame(CGRect(x: 1440, y: -1055, width: 960, height: 1055), of: window)
+
+        XCTAssertEqual(client.setOperations[1].pointValue, CGPoint(x: 1440, y: 900))
+    }
+
     func testSetFrameThrowsWhenAXSetAttributeFails() {
         let client = MockAXUIElementClient()
         client.setAttributeError = .failure
@@ -86,6 +96,21 @@ private func singleMainScreen() -> MockAccessibilityScreenProvider {
             frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
             visibleFrame: CGRect(x: 0, y: 25, width: 1440, height: 875),
             isMain: true
+        )
+    ])
+}
+
+private func lowerAuxiliaryScreens() -> MockAccessibilityScreenProvider {
+    MockAccessibilityScreenProvider(displayFrames: [
+        DisplayFrame(
+            frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1440, height: 875),
+            isMain: true
+        ),
+        DisplayFrame(
+            frame: CGRect(x: 1440, y: -1080, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: 1440, y: -1055, width: 1920, height: 1055),
+            isMain: false
         )
     ])
 }

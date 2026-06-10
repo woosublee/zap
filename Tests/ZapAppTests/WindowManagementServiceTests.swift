@@ -245,6 +245,37 @@ final class WindowManagementServiceTests: XCTestCase {
         XCTAssertEqual(calculator.capturedInputs.first?.destinationVisibleFrame, CGRect(x: 0, y: 25, width: 1440, height: 875))
     }
 
+    func testPositioningUsesAuxiliaryDisplayVisibleFrameWhenWindowStartsOnAuxiliaryDisplay() {
+        let window = AccessibilityWindow.mock(applicationIdentifier: "com.example.App", elementID: "window-1")
+        let currentFrame = CGRect(x: 1610, y: 120, width: 700, height: 500)
+        let expectedTargetFrame = CGRect(x: 1440, y: 25, width: 960, height: 1055)
+        let windows = MockAccessibilityWindows(frontmostWindow: window)
+        windows.frameResults = [.success(currentFrame), .success(expectedTargetFrame)]
+        let screens = MockScreenProvider(displayFrames: [
+            DisplayFrame(
+                frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+                visibleFrame: CGRect(x: 0, y: 25, width: 1440, height: 875),
+                isMain: true
+            ),
+            DisplayFrame(
+                frame: CGRect(x: 1440, y: 0, width: 1920, height: 1080),
+                visibleFrame: CGRect(x: 1440, y: 25, width: 1920, height: 1055),
+                isMain: false
+            )
+        ])
+        let calculator = MockWindowPositionCalculator(result: WindowCalculationResult(frame: expectedTargetFrame, resolvedAction: .leftHalf))
+        let history = MockWindowHistoryRecorder()
+        let feedback = MockFailureFeedback()
+        let service = makeService(windows: windows, screens: screens, calculator: calculator, history: history, feedback: feedback)
+
+        let result = service.perform(action: .leftHalf)
+
+        XCTAssertEqual(result, .success(action: .leftHalf, frame: expectedTargetFrame))
+        XCTAssertEqual(calculator.capturedInputs.first?.sourceVisibleFrame, CGRect(x: 1440, y: 25, width: 1920, height: 1055))
+        XCTAssertEqual(calculator.capturedInputs.first?.destinationVisibleFrame, CGRect(x: 1440, y: 25, width: 1920, height: 1055))
+        XCTAssertEqual(windows.capturedSetFrames, [expectedTargetFrame])
+    }
+
     func testPerformRejectsSheetAndSystemDialogBeforeCalculation() {
         let sheetWindow = AccessibilityWindow.mock(
             applicationIdentifier: "com.example.App",

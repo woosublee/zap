@@ -22,7 +22,7 @@ enum AboutWindowPresenter {
     static func makeWindow(info: AboutInfo, appName: String = AboutPresentation.currentAppName) -> NSWindow {
         let presentation = AboutPresentation(appName: appName, info: info)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 260),
+            contentRect: NSRect(x: 0, y: 0, width: 292, height: 260),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

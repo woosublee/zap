@@ -5,6 +5,7 @@ struct MenuBarView: View {
     @ObservedObject var model: ZapAppModel
     @ObservedObject var updateService: UpdateService
     let openSettings: () -> Void
+    let openWindowManagementSettings: () -> Void
     let openAbout: () -> Void
     let quit: () -> Void
 
@@ -19,65 +20,95 @@ struct MenuBarView: View {
 
             separator
 
-            if let registrationError = model.registrationError {
-                Text(registrationError)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .lineLimit(3)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+            sectionLabel("Status")
+            statusSection
 
-                separator
-            }
+            separator
 
-            if let windowManagementError = model.windowManagementModel.windowManagementError {
-                Text(windowManagementError)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .lineLimit(2)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-
-                separator
-            }
-
+            sectionLabel("Quick Launch")
             shortcutList
 
             separator
 
+            sectionLabel("Window Management")
+            MenuRow(label: "Window Shortcuts...", systemImage: "rectangle.3.group") {
+                dismiss()
+                openWindowManagementSettings()
+            }
+
+            separator
+
+            sectionLabel("Maintenance")
             MenuRow(label: "Refresh Dock Apps", systemImage: "arrow.clockwise") {
                 model.refreshDockItems()
-            }
-            MenuRow(label: "Settings...", systemImage: "gearshape", shortcut: "⌘,") {
-                dismiss()
-                openSettings()
             }
             MenuRow(label: "Check for Updates...", systemImage: "arrow.triangle.2.circlepath") {
                 dismiss()
                 updateService.checkForUpdates()
             }
+
+            separator
+
+            sectionLabel("App")
+            MenuRow(label: "Settings...", systemImage: "gearshape", shortcut: "⌘,") {
+                dismiss()
+                openSettings()
+            }
             MenuRow(label: AboutPresentation.aboutMenuLabel(appName: AboutPresentation.currentAppName), systemImage: "info.circle") {
                 dismiss()
                 openAbout()
             }
-
-            separator
-
             MenuRow(label: "Quit \(AboutPresentation.currentAppName)", systemImage: nil, shortcut: "⌘Q") {
                 quit()
             }
         }
         .padding(.vertical, 5)
-        .frame(width: 320)
+        .frame(width: 340)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(AboutPresentation.currentAppName)
-                .font(.system(size: 13, weight: .semibold))
-            Text("Launch Dock apps with number shortcuts")
-                .font(.system(size: 11.5))
-                .foregroundStyle(.secondary)
+        HStack(spacing: 9) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 30, height: 30)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(AboutPresentation.currentAppName)
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Launch apps without leaving the keyboard")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var statusSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            StatusRow(
+                label: "Accessibility",
+                status: model.windowManagementModel.accessibilityTrusted ? "Ready" : "Needs Permission",
+                systemImage: model.windowManagementModel.accessibilityTrusted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                isWarning: !model.windowManagementModel.accessibilityTrusted
+            )
+
+            if let registrationError = model.registrationError {
+                StatusRow(
+                    label: "Shortcut registration",
+                    status: registrationError,
+                    systemImage: "exclamationmark.triangle.fill",
+                    isWarning: true
+                )
+            }
+
+            if let windowManagementError = model.windowManagementModel.windowManagementError {
+                StatusRow(
+                    label: "Window management",
+                    status: windowManagementError,
+                    systemImage: "exclamationmark.triangle.fill",
+                    isWarning: true
+                )
+            }
         }
     }
 
@@ -104,17 +135,26 @@ struct MenuBarView: View {
             }
 
             ForEach(NumberKey.allCases) { key in
-                let item = model.dockItem(for: key)
-                MenuRow(
-                    label: item?.name ?? "Dock slot \(key.rawValue)",
-                    systemImage: item == nil ? "minus.circle" : "app.dashed",
-                    shortcut: model.shortcutTitle(for: key),
-                    disabled: item == nil
-                ) {
-                    model.activateDockItem(for: key)
+                if let item = model.dockItem(for: key) {
+                    MenuRow(
+                        label: item.name,
+                        systemImage: "app.dashed",
+                        shortcut: model.shortcutTitle(for: key)
+                    ) {
+                        model.activateDockItem(for: key)
+                    }
                 }
             }
         }
+    }
+
+    private func sectionLabel(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.top, 5)
+            .padding(.bottom, 3)
     }
 
     private var separator: some View {
@@ -123,6 +163,36 @@ struct MenuBarView: View {
             .frame(height: 0.5)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
+    }
+}
+
+private struct StatusRow: View {
+    let label: String
+    let status: String
+    let systemImage: String
+    let isWarning: Bool
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(isWarning ? .orange : .green)
+                .frame(width: 14)
+
+            Text(label)
+                .font(.system(size: 13))
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(isWarning ? .orange : .secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 17)
+        .padding(.vertical, 5)
     }
 }
 
@@ -158,9 +228,7 @@ private struct MenuRow: View {
                 Spacer(minLength: 8)
 
                 if let shortcut {
-                    Text(shortcut)
-                        .font(.system(size: 11.5, design: .monospaced))
-                        .foregroundStyle(hovering ? Color.white.opacity(0.85) : Color.secondary)
+                    ShortcutKeycapGroupView(shortcut: shortcut, isDisabled: disabled)
                 }
             }
             .padding(.horizontal, 12)
@@ -175,7 +243,7 @@ private struct MenuRow: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        .opacity(disabled ? 0.5 : 1)
+        .opacity(disabled ? 0.48 : 1)
         .onHover { value in
             guard !disabled else { return }
             hovering = value
