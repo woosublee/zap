@@ -16,6 +16,8 @@ final class ZapAppModel: ObservableObject {
     @Published private(set) var loginItemError: String?
     @Published private(set) var inputSourceRevision = 0
 
+    let windowManagementModel: WindowManagementModel
+
     private var inputSourceObserver: NSObjectProtocol?
     private var appReopenObserver: NSObjectProtocol?
 
@@ -44,20 +46,31 @@ final class ZapAppModel: ObservableObject {
     private let appLauncher: any AppLaunching
     private let loginItemService: any LoginItemControlling
     private let updateService: UpdateService
-    private lazy var hotKeyService = GlobalHotKeyService(
-        onDockHotKey: { [weak self] key in
+    private let hotKeyServiceFactory: (
+        @escaping (NumberKey) -> Void,
+        @escaping () -> Void,
+        @escaping (UUID) -> Void,
+        @escaping (WindowAction) -> Void
+    ) -> any GlobalHotKeyServicing
+    private lazy var hotKeyService: any GlobalHotKeyServicing = hotKeyServiceFactory(
+        { [weak self] key in
             Task { @MainActor [weak self] in
                 self?.activateDockItem(for: key)
             }
         },
-        onFinderHotKey: { [weak self] in
+        { [weak self] in
             Task { @MainActor [weak self] in
                 self?.activateFinder()
             }
         },
-        onManualHotKey: { [weak self] id in
+        { [weak self] id in
             Task { @MainActor [weak self] in
                 self?.activateManualShortcut(id: id)
+            }
+        },
+        { [weak self] action in
+            Task { @MainActor [weak self] in
+                _ = self?.windowManagementModel.perform(action: action)
             }
         }
     )
@@ -66,16 +79,36 @@ final class ZapAppModel: ObservableObject {
         dockItemProvider: any DockItemProviding = DockItemProvider(),
         appLauncher: any AppLaunching = AppLauncher(),
         loginItemService: any LoginItemControlling = LoginItemService(),
-        updateService: UpdateService
+        updateService: UpdateService,
+        windowManagementModel: WindowManagementModel? = nil,
+        hotKeyServiceFactory: @escaping (
+            @escaping (NumberKey) -> Void,
+            @escaping () -> Void,
+            @escaping (UUID) -> Void,
+            @escaping (WindowAction) -> Void
+        ) -> any GlobalHotKeyServicing = { onDockHotKey, onFinderHotKey, onManualHotKey, onWindowHotKey in
+            GlobalHotKeyService(
+                onDockHotKey: onDockHotKey,
+                onFinderHotKey: onFinderHotKey,
+                onManualHotKey: onManualHotKey,
+                onWindowHotKey: onWindowHotKey
+            )
+        }
     ) {
         self.dockItemProvider = dockItemProvider
         self.appLauncher = appLauncher
         self.loginItemService = loginItemService
         self.updateService = updateService
+        self.windowManagementModel = windowManagementModel ?? WindowManagementModel()
+        self.hotKeyServiceFactory = hotKeyServiceFactory
         self.manualShortcuts = Self.loadManualShortcuts()
         self.isFinderShortcutEnabled = UserDefaults.standard.bool(forKey: Self.finderShortcutEnabledKey)
         self.selectedModifiers = Self.loadModifiers()
         self.startAtLogin = UserDefaults.standard.bool(forKey: Self.startAtLoginKey)
+
+        self.windowManagementModel.onShortcutConfigurationChanged = { [weak self] in
+            self?.registerHotKeys()
+        }
 
         refreshDockItems()
         registerHotKeys()
@@ -188,7 +221,8 @@ final class ZapAppModel: ObservableObject {
         registrationError = hotKeyService.register(
             modifiers: selectedModifiers,
             finderShortcutEnabled: isFinderShortcutEnabled,
-            manualShortcuts: manualShortcuts
+            manualShortcuts: manualShortcuts,
+            windowShortcuts: windowManagementModel.windowShortcutsForRegistration
         )
     }
 

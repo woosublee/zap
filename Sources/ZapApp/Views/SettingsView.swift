@@ -21,11 +21,14 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             }
 
-            if selectedMode == .automatic {
+            switch selectedMode {
+            case .automatic:
                 automaticShortcutsSection
                 automaticSection
-            } else {
+            case .manual:
                 manualSection
+            case .windowManagement:
+                WindowManagementSettingsView(model: model.windowManagementModel, registrationError: model.registrationError)
             }
 
             behaviorSection
@@ -226,9 +229,10 @@ struct SettingsView: View {
     }
 }
 
-private enum SettingsMode: String, CaseIterable, Identifiable {
+enum SettingsMode: String, CaseIterable, Identifiable {
     case automatic
     case manual
+    case windowManagement
 
     var id: String { rawValue }
 
@@ -236,6 +240,7 @@ private enum SettingsMode: String, CaseIterable, Identifiable {
         switch self {
         case .automatic: "Automatic"
         case .manual: "Manual"
+        case .windowManagement: "Window Management"
         }
     }
 }
