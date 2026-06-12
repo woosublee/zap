@@ -7,8 +7,7 @@ It is built for people who keep their most-used apps in the Dock, prefer custom 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshots/settings-automatic.png" alt="Zap Settings in Automatic mode" width="45%">
-  <img src="assets/screenshots/settings-manual.png" alt="Zap Settings in Manual mode" width="45%">
+  <img src="assets/screenshots/settings-automatic.png" alt="Zap Settings in Automatic mode" width="92%">
 </p>
 <p align="center">
   <img src="assets/screenshots/settings-window-management.png" alt="Zap Settings in Window Management mode" width="92%">
