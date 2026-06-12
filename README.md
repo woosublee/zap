@@ -1,8 +1,8 @@
 # Zap
 
-Zap is a native macOS utility for opening and switching to apps with global keyboard shortcuts.
+Zap is a native macOS utility for opening apps, switching to them, and managing windows with global keyboard shortcuts.
 
-It is built for people who keep their most-used apps in the Dock and want to reach them without moving their hands away from the keyboard. Zap can automatically map Dock apps to number shortcuts, and it also supports manually registered app shortcuts for anything that does not fit the Dock-based workflow.
+It is built for people who keep their most-used apps in the Dock, prefer custom app shortcuts, and want keyboard-first window control. Zap can automatically map Dock apps to number shortcuts, register manual app shortcuts, and move or resize the frontmost window without reaching for the mouse.
 
 ## Screenshots
 
@@ -10,12 +10,22 @@ It is built for people who keep their most-used apps in the Dock and want to rea
   <img src="assets/screenshots/settings-automatic.png" alt="Zap Settings in Automatic mode" width="45%">
   <img src="assets/screenshots/settings-manual.png" alt="Zap Settings in Manual mode" width="45%">
 </p>
+<p align="center">
+  <img src="assets/screenshots/settings-window-management.png" alt="Zap Settings in Window Management mode" width="92%">
+</p>
+
+## Recent updates
+
+- Added Window Management shortcuts for centering, fullscreen, halves, corners, thirds, resizing, display movement, undo, and redo.
+- Reworked Settings into a sidebar with Automatic, Manual, Window Management, General, and About pages.
+- Updated the menu bar experience with native Quick Launch and Window Control menus.
+- Updated release metadata and Sparkle appcast examples to version `0.1.4`, build `5`.
 
 ## What Zap does
 
-Zap gives you two ways to launch or focus apps.
+Zap combines app launching and window control.
 
-### Automatic mode
+### Automatic Dock shortcuts
 
 Automatic mode reads the apps pinned to your macOS Dock and maps the first nine apps to number keys.
 
@@ -27,7 +37,7 @@ For example, if the Dock shortcut modifier is set to `⌥`:
 
 You can choose the modifier keys used with the number shortcuts from Settings. Zap supports `⌘`, `⌃`, `⌥`, and `⇧` combinations.
 
-### Manual mode
+### Manual app shortcuts
 
 Manual mode lets you add apps directly and assign custom global shortcuts to them.
 
@@ -38,6 +48,21 @@ This is useful when:
 - you want a shortcut that is separate from the automatic Dock order.
 
 Manual shortcuts can be enabled, disabled, re-recorded, or removed at any time.
+
+### Window Management shortcuts
+
+Window Management moves and resizes the frontmost window with customizable global shortcuts. The default set includes:
+
+- `⌥⌘C` to center the active window;
+- `⌥⌘F` to make it fullscreen;
+- `⌥⌘←`, `⌥⌘→`, `⌥⌘↑`, and `⌥⌘↓` for half-screen layouts;
+- corner placement shortcuts;
+- previous and next display shortcuts;
+- previous and next third shortcuts;
+- larger and smaller resize shortcuts;
+- undo and redo for window layout changes.
+
+Window Management requires macOS Accessibility permission so Zap can move and resize other apps' windows. If permission has not been granted yet, Zap shows the permission state in Settings and locks the window shortcuts until access is available.
 
 ## Finder shortcut
 
@@ -54,15 +79,24 @@ The shortcut is based on the physical key, so it continues to work across Korean
 
 By default, Zap runs as a menu bar app.
 
+The native menu bar menu includes:
+
+- Quick Launch for Finder, manual app shortcuts, and Dock number shortcuts;
+- Window Control for Window Management actions;
+- Refresh Dock Apps;
+- Check for Updates;
+- Settings;
+- Quit.
+
 If you hide the menu bar icon, Zap switches to a regular Dock app so Settings is still reachable. Clicking the Dock icon opens the Settings window.
 
 ## Settings
 
-Zap has two main Settings modes.
+Zap Settings is organized into sidebar pages.
 
 ### Automatic
 
-Use Automatic mode to:
+Use Automatic to:
 
 - configure Dock app number shortcuts;
 - enable or disable the Finder shortcut;
@@ -71,20 +105,45 @@ Use Automatic mode to:
 
 ### Manual
 
-Use Manual mode to:
+Use Manual to:
 
 - add an app shortcut;
 - record a custom shortcut;
 - enable or disable a shortcut;
 - remove shortcuts you no longer need.
 
-Automatic and Manual shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Zap shows a registration error.
+### Window Management
 
-## Privacy
+Use Window Management to:
+
+- enable or disable window shortcuts;
+- review shortcuts grouped by Positioning, Display, Sizing, and History;
+- record custom shortcuts for each action;
+- reset all window shortcuts to their defaults;
+- see whether Accessibility permission is currently granted.
+
+### General
+
+Use General to:
+
+- request Accessibility permission;
+- enable or disable launch at login;
+- show or hide the menu bar icon;
+- check for Sparkle updates.
+
+### About
+
+Use About to view the current app version, build number, and creator link.
+
+Automatic, Manual, and Window Management shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Zap shows a registration error.
+
+## Privacy and permissions
 
 Zap runs locally on your Mac.
 
-It does not use a server, does not collect analytics, and does not send your app list or shortcut settings anywhere. App and shortcut settings are stored locally with `UserDefaults`.
+It does not use a server, does not collect analytics, and does not send your app list, window information, or shortcut settings anywhere. App and shortcut settings are stored locally with `UserDefaults`.
+
+Window Management uses macOS Accessibility APIs to move and resize other apps' windows. Granting Accessibility permission only enables local window-control behavior for Zap; it does not change Zap's data collection behavior.
 
 ## Build and run
 
@@ -204,4 +263,6 @@ Upload all three files to the GitHub Release matching `v0.1.4`. Sparkle reads `a
 - Dock shortcuts depend on the current pinned Dock app order.
 - Global shortcuts may conflict with shortcuts registered by macOS or other apps.
 - Manual shortcuts are local to the current macOS user account.
-- Zap is currently distributed as a locally built macOS app bundle.
+- Window Management shortcuts require Accessibility permission.
+- Some apps may limit how far macOS lets Zap move or resize their windows.
+- Production update artifacts are built locally and published through GitHub Releases.
