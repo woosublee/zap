@@ -122,6 +122,76 @@ It does not use a server, does not collect analytics, and does not send your app
 
 Window Management uses macOS Accessibility APIs to move and resize other apps' windows. Granting Accessibility permission only enables local window-control behavior for Zap; it does not change Zap's data collection behavior.
 
+## Cutting an automatic-update release
+
+Automatic-update releases are built by the **Self-signed Release** GitHub Actions workflow and published as GitHub Release assets. The app checks the Sparkle feed at:
+
+```text
+https://github.com/woosublee/zap/releases/latest/download/appcast.xml
+```
+
+The release workflow requires these GitHub Secrets:
+
+- `ZAP_CERTIFICATE_BASE64`: base64-encoded `.p12` for the self-signed `zap` code signing certificate, including its private key.
+- `ZAP_CERTIFICATE_PASSWORD`: password for that `.p12`.
+- `SPARKLE_PRIVATE_KEY`: Sparkle EdDSA private key for signing `appcast.xml`.
+
+The committed Sparkle public key lives in `Info.plist` as `SUPublicEDKey`. The private key and `.p12` certificate export must not be committed.
+
+Use the canonical Keychain item for the Sparkle private key:
+
+```zsh
+make generate-eddsa-key
+make check-eddsa-key
+```
+
+If you already have the Sparkle private key in a file, copy it into the canonical item instead of generating a new public key:
+
+```zsh
+security add-generic-password \
+  -U \
+  -s "https://sparkle-project.org" \
+  -a "com.woosublee.Zap.sparkle.ed25519" \
+  -l "Private key for signing Sparkle updates" \
+  -D "private key" \
+  -j "Public key (SUPublicEDKey value) for this key is:\n\n$(plutil -extract SUPublicEDKey raw Info.plist)" \
+  -w "$(cat build/sparkle_private_key.txt)"
+```
+
+After the local Sparkle keychain item is present, register the GitHub Secrets from the local machine:
+
+```zsh
+scripts/register-release-secrets.sh
+```
+
+The script validates that the Sparkle private key matches `Info.plist` and registers `ZAP_CERTIFICATE_BASE64`, `ZAP_CERTIFICATE_PASSWORD`, and `SPARKLE_PRIVATE_KEY` with `gh secret set`. By default it creates a CI-only self-signed `zap` `.p12`; if you already have a stable `.p12`, pass it with `ZAP_CERTIFICATE_P12=/path/to/zap.p12 ZAP_CERTIFICATE_PASSWORD=... scripts/register-release-secrets.sh`. Existing certificate secrets are not overwritten unless `ZAP_ROTATE_CERTIFICATE=1` is set intentionally. The script does not print the secret values.
+
+Before running the workflow, update the version and build number in both `Info.plist` and `Makefile`. The workflow rejects releases when `make -s print-app-version`, `make -s print-build-number`, `make -s print-build-tag`, and the workflow input tag disagree.
+
+Run the **Self-signed Release** GitHub Actions workflow with a new tag such as `v1.2.3`. Do not create the tag first; the workflow checks that the remote tag does not already exist, builds from the workflow commit, signs the app and DMG with the imported `zap` certificate, generates `dist/appcast.xml`, creates the tag, and uploads both release assets:
+
+- `Zap-<version>.dmg`
+- `appcast.xml`
+
+This CI release is self-signed and non-notarized. It keeps the Sparkle update path compatible with local self-signed releases, but it does not remove first-launch Gatekeeper warnings for brand-new installs. A Developer ID signed and notarized release path can be introduced later.
+
+### Local fallback release
+
+Local fallback releases require a code signing identity named `zap` in the local Keychain. Create or confirm it before cutting a fallback release:
+
+```zsh
+make create-local-certificate
+security find-identity -v -p codesigning | grep '"zap"'
+```
+
+The fallback script validates the `v*` tag, requires the local `zap` code signing identity, reads the version metadata from `Makefile`, builds and verifies the signed DMG, signs the DMG, generates `dist/appcast.xml` using the Keychain Sparkle private key, and uploads both release assets with the authenticated `gh` CLI:
+
+```zsh
+scripts/release-local.sh v1.2.3
+```
+
+By default, the fallback script does not clobber existing GitHub Release assets. Set `ALLOW_LOCAL_RELEASE_CLOBBER=1` only when you intentionally want to replace the DMG and appcast for an existing release.
+
 ## Notes
 
 - Requires macOS 13 or later.
