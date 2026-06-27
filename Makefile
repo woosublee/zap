@@ -42,7 +42,7 @@ ENTITLEMENTS := Zap.entitlements
 RELEASE_ARCHIVE := $(DIST_DIR)/$(APP_NAME)-$(VERSION).zip
 RELEASE_DMG := $(DIST_DIR)/$(APP_NAME)-$(VERSION).dmg
 
-.PHONY: all print-app-version print-build-number print-build-tag swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive release-dmg verify-dmg sign-dmg appcast release
+.PHONY: all print-app-version print-build-number print-build-tag swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive release-dmg verify-dmg sign-dmg prepare-release-dmg appcast release
 
 all: sign
 
@@ -222,28 +222,25 @@ release-dmg: release-archive
 	hdiutil verify "$(RELEASE_DMG)"
 	@echo "Created $(RELEASE_DMG)"
 
-verify-dmg: release-dmg
+verify-dmg:
 	test -f "$(RELEASE_DMG)"
-	scripts/verify-dmg.sh "$(RELEASE_DMG)"
-	@mount_dir="$$(mktemp -d /tmp/$(APP_NAME).dmg.XXXXXX)"; \
-	cleanup() { hdiutil detach "$$mount_dir" >/dev/null 2>&1 || hdiutil detach -force "$$mount_dir" >/dev/null 2>&1 || true; rm -rf "$$mount_dir"; }; \
-	trap cleanup EXIT; \
-	hdiutil attach "$(RELEASE_DMG)" -mountpoint "$$mount_dir" -nobrowse -quiet; \
-	test -d "$$mount_dir/$(PROD_APP_NAME).app" || { echo "Missing app in DMG"; exit 1; }; \
-	codesign --verify --deep --strict --verbose=2 "$$mount_dir/$(PROD_APP_NAME).app"; \
-	echo "DMG verification passed"
+	APP_NAME="$(PROD_APP_NAME)" scripts/verify-dmg.sh "$(RELEASE_DMG)"
 
 sign-dmg:
 	test -f "$(RELEASE_DMG)" || { echo "Missing DMG: $(RELEASE_DMG)"; exit 1; }
 	codesign --force --sign "$(CODESIGN_IDENTITY)" "$(RELEASE_DMG)"
 	@echo "Signed $(RELEASE_DMG)"
 
-appcast: release-dmg
+prepare-release-dmg: release-dmg
+	$(MAKE) verify-dmg
 	$(MAKE) sign-dmg CODESIGN_IDENTITY="$(CODESIGN_IDENTITY)"
-	RELEASE_TAG="v$(VERSION)" VERSION="$(VERSION)" BUILD_NUMBER="$(BUILD_NUMBER)" DMG_PATH="$(RELEASE_DMG)" APPCAST_PATH="$(DIST_DIR)/appcast.xml" REPOSITORY="$(REPOSITORY)" scripts/generate-sparkle-appcast.sh
+	$(MAKE) verify-dmg
+
+appcast: prepare-release-dmg check-eddsa-key $(SPARKLE_TOOLS_STAMP)
+	RELEASE_TAG="v$(VERSION)" VERSION="$(VERSION)" BUILD_NUMBER="$(BUILD_NUMBER)" DMG_PATH="$(RELEASE_DMG)" APPCAST_PATH="$(DIST_DIR)/appcast.xml" REPOSITORY="$(REPOSITORY)" SPARKLE_SIGN_UPDATE="$(SPARKLE_SIGN_UPDATE)" scripts/generate-sparkle-appcast.sh
 	@echo "Created $(DIST_DIR)/appcast.xml"
 
-release: create-local-certificate check-eddsa-key appcast
+release: create-local-certificate appcast
 	@echo "Release archive: $(RELEASE_ARCHIVE)"
 	@echo "Release DMG: $(RELEASE_DMG)"
 	@echo "Appcast: $(DIST_DIR)/appcast.xml"

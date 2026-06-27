@@ -47,9 +47,10 @@ find_sign_update() {
     return
   fi
 
-  local tools_dir="$REPO_ROOT/build/sparkle-tools"
-  local archive="$tools_dir/Sparkle-${SPARKLE_VERSION}.tar.xz"
-  mkdir -p "$tools_dir"
+  local tools_parent="$REPO_ROOT/build/sparkle-tools"
+  local tools_dir="$tools_parent/Sparkle-${SPARKLE_VERSION}"
+  local archive="$tools_parent/Sparkle-${SPARKLE_VERSION}.tar.xz"
+  mkdir -p "$tools_parent"
 
   if [[ ! -f "$archive" ]]; then
     curl -fsSL \
@@ -57,12 +58,14 @@ find_sign_update() {
       -o "$archive"
   fi
 
-  if ! find "$tools_dir" -type f -name sign_update -exec test -x {} \; -print -quit 2>/dev/null | grep -q .; then
-    tar -xJf "$archive" -C "$tools_dir"
+  local sign_update
+  sign_update="$(find "$tools_dir" -type f -name sign_update -exec test -x {} \; -print 2>/dev/null | sed -n '1p')"
+  if [[ -z "$sign_update" ]]; then
+    rm -rf "$tools_dir"
+    tar -xJf "$archive" -C "$tools_parent"
+    sign_update="$(find "$tools_dir" -type f -name sign_update -exec test -x {} \; -print 2>/dev/null | sed -n '1p')"
   fi
 
-  local sign_update
-  sign_update="$(find "$tools_dir" -type f -name sign_update -exec test -x {} \; -print -quit)"
   [[ -n "$sign_update" ]] || fail "sign_update not found under $tools_dir"
   printf '%s\n' "$sign_update"
 }
@@ -82,7 +85,7 @@ ed_signature="$(printf '%s\n' "$signature_output" | sed -n 's/.*sparkle:edSignat
 [[ -n "$ed_signature" ]] || fail "Unable to parse sparkle:edSignature from sign_update output"
 
 length="$(wc -c < "$DMG_PATH" | tr -d '[:space:]')"
-pub_date="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
+pub_date="$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')"
 dmg_name="$(basename "$DMG_PATH")"
 dmg_url="https://github.com/${REPOSITORY}/releases/download/${RELEASE_TAG}/${dmg_name}"
 appcast_dir="$(dirname "$APPCAST_PATH")"

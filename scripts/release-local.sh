@@ -34,15 +34,15 @@ fi
 REPOSITORY="${REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
 export RELEASE_TAG VERSION BUILD_NUMBER APPCAST_PATH DMG_PATH REPOSITORY
 
-make VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUILD_TAG="$RELEASE_TAG" verify-dmg
-make VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUILD_TAG="$RELEASE_TAG" sign-dmg
+make VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUILD_TAG="$RELEASE_TAG" CODESIGN_IDENTITY="$CODESIGN_IDENTITY" prepare-release-dmg
+make -s check-eddsa-key
 scripts/generate-sparkle-appcast.sh
 
-gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
-  gh release create "$RELEASE_TAG" --verify-tag --title "Zap $VERSION" --notes "$RELEASE_NOTES"
+gh release view "$RELEASE_TAG" --repo "$REPOSITORY" >/dev/null 2>&1 || \
+  gh release create "$RELEASE_TAG" --repo "$REPOSITORY" --verify-tag --title "Zap $VERSION" --notes "$RELEASE_NOTES"
 
 if [[ "${ALLOW_LOCAL_RELEASE_CLOBBER:-}" == "1" ]]; then
-  gh release upload "$RELEASE_TAG" "$DMG_PATH" "$APPCAST_PATH" --clobber
+  gh release upload "$RELEASE_TAG" "$DMG_PATH" "$APPCAST_PATH" --repo "$REPOSITORY" --clobber
 else
-  gh release upload "$RELEASE_TAG" "$DMG_PATH" "$APPCAST_PATH"
+  gh release upload "$RELEASE_TAG" "$DMG_PATH" "$APPCAST_PATH" --repo "$REPOSITORY"
 fi

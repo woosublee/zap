@@ -20,6 +20,16 @@ if grep -q -- '-perm +111' "$SCRIPT"; then
   exit 1
 fi
 
+if grep -q -- '-quit' "$SCRIPT"; then
+  echo "FAIL: generate-sparkle-appcast.sh must not use GNU-only find -quit" >&2
+  exit 1
+fi
+
+if ! grep -q 'LC_ALL=C date' "$SCRIPT"; then
+  echo "FAIL: generate-sparkle-appcast.sh must force C locale for pubDate" >&2
+  exit 1
+fi
+
 fail() {
   echo "FAIL: $*" >&2
   exit 1
