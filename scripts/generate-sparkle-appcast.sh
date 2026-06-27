@@ -8,6 +8,7 @@ REPOSITORY="${REPOSITORY:-woosublee/zap}"
 APP_NAME="${APP_NAME:-Zap}"
 APPCAST_PATH="${APPCAST_PATH:-dist/appcast.xml}"
 SPARKLE_VERSION="${SPARKLE_VERSION:-2.9.2}"
+SPARKLE_TOOLS_DIR="${SPARKLE_TOOLS_DIR:-$REPO_ROOT/build/sparkle-tools}"
 SPARKLE_KEYCHAIN_SERVICE="${SPARKLE_KEYCHAIN_SERVICE:-https://sparkle-project.org}"
 SPARKLE_KEYCHAIN_ACCOUNT="${SPARKLE_KEYCHAIN_ACCOUNT:-com.woosublee.Zap.sparkle.ed25519}"
 
@@ -40,6 +41,12 @@ require_env DMG_PATH
 
 [[ -f "$DMG_PATH" ]] || fail "DMG_PATH does not exist: $DMG_PATH"
 
+find_existing_sign_update() {
+  local tools_dir="$1"
+  [[ -d "$tools_dir" ]] || return 0
+  find "$tools_dir" -type f -name sign_update -exec test -x {} \; -print 2>/dev/null | sed -n '1p'
+}
+
 find_sign_update() {
   if [[ -n "${SPARKLE_SIGN_UPDATE:-}" ]]; then
     [[ -x "$SPARKLE_SIGN_UPDATE" ]] || fail "SPARKLE_SIGN_UPDATE is not executable: $SPARKLE_SIGN_UPDATE"
@@ -47,7 +54,7 @@ find_sign_update() {
     return
   fi
 
-  local tools_parent="$REPO_ROOT/build/sparkle-tools"
+  local tools_parent="$SPARKLE_TOOLS_DIR"
   local tools_dir="$tools_parent/Sparkle-${SPARKLE_VERSION}"
   local archive="$tools_parent/Sparkle-${SPARKLE_VERSION}.tar.xz"
   mkdir -p "$tools_parent"
@@ -59,11 +66,12 @@ find_sign_update() {
   fi
 
   local sign_update
-  sign_update="$(find "$tools_dir" -type f -name sign_update -exec test -x {} \; -print 2>/dev/null | sed -n '1p')"
+  sign_update="$(find_existing_sign_update "$tools_dir")"
   if [[ -z "$sign_update" ]]; then
     rm -rf "$tools_dir"
-    tar -xJf "$archive" -C "$tools_parent"
-    sign_update="$(find "$tools_dir" -type f -name sign_update -exec test -x {} \; -print 2>/dev/null | sed -n '1p')"
+    mkdir -p "$tools_dir"
+    tar -xJf "$archive" -C "$tools_dir" --strip-components 1
+    sign_update="$(find_existing_sign_update "$tools_dir")"
   fi
 
   [[ -n "$sign_update" ]] || fail "sign_update not found under $tools_dir"

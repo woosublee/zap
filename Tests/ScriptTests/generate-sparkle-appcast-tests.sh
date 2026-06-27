@@ -25,6 +25,11 @@ if grep -q -- '-quit' "$SCRIPT"; then
   exit 1
 fi
 
+if ! grep -q -- '--strip-components 1' "$SCRIPT"; then
+  echo "FAIL: generate-sparkle-appcast.sh must normalize the Sparkle archive directory" >&2
+  exit 1
+fi
+
 if ! grep -q 'LC_ALL=C date' "$SCRIPT"; then
   echo "FAIL: generate-sparkle-appcast.sh must force C locale for pubDate" >&2
   exit 1
