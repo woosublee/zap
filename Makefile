@@ -20,7 +20,8 @@ SPARKLE_GENERATE_KEYS := $(SPARKLE_TOOLS_ROOT)/bin/generate_keys
 SPARKLE_GENERATE_APPCAST := $(SPARKLE_TOOLS_ROOT)/bin/generate_appcast
 SPARKLE_SIGN_UPDATE := $(SPARKLE_TOOLS_ROOT)/bin/sign_update
 SPARKLE_ACCOUNT ?= com.woosublee.Zap.sparkle.ed25519
-DOWNLOAD_BASE_URL ?= https://github.com/woosublee/zap/releases/download/v$(VERSION)/
+REPOSITORY ?= woosublee/zap
+DOWNLOAD_BASE_URL ?= https://github.com/$(REPOSITORY)/releases/download/v$(VERSION)/
 ICON_NAME ?= Zap
 ICON_FILE ?= Resources/$(ICON_NAME).icns
 MENU_BAR_ICON_FILE ?= Resources/ZapMenuBarIcon.png
@@ -41,9 +42,18 @@ ENTITLEMENTS := Zap.entitlements
 RELEASE_ARCHIVE := $(DIST_DIR)/$(APP_NAME)-$(VERSION).zip
 RELEASE_DMG := $(DIST_DIR)/$(APP_NAME)-$(VERSION).dmg
 
-.PHONY: all swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive release-dmg appcast release
+.PHONY: all print-app-version print-build-number print-build-tag swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive release-dmg verify-dmg sign-dmg appcast release
 
 all: sign
+
+print-app-version:
+	@printf '%s\n' "$(VERSION)"
+
+print-build-number:
+	@printf '%s\n' "$(BUILD_NUMBER)"
+
+print-build-tag:
+	@printf 'v%s\n' "$(VERSION)"
 
 swift-build:
 	swift build -c $(CONFIGURATION) --product "$(PRODUCT_NAME)"
@@ -212,21 +222,32 @@ release-dmg: release-archive
 	hdiutil verify "$(RELEASE_DMG)"
 	@echo "Created $(RELEASE_DMG)"
 
-appcast: $(SPARKLE_TOOLS_STAMP) release-dmg check-eddsa-key
-	@tmpdir="$(DIST_DIR)/appcast-input"; \
-	rm -rf "$$tmpdir"; \
-	mkdir -p "$$tmpdir"; \
-	cp "$(RELEASE_ARCHIVE)" "$$tmpdir/"; \
-	"$(SPARKLE_GENERATE_APPCAST)" --account "$(SPARKLE_ACCOUNT)" --download-url-prefix "$(DOWNLOAD_BASE_URL)" -o "$(DIST_DIR)/appcast.xml" "$$tmpdir"; \
-	rm -rf "$$tmpdir"
-	python3 -c 'exec("\n".join(["from pathlib import Path", "import re", "import sys", "from xml.sax.saxutils import escape, unescape", "path = Path(sys.argv[1])", "text = path.read_text()", "item_pattern = re.compile(r\"(<item\\b[^>]*>)(.*?)(</item>)\", re.DOTALL)", "version_pattern = re.compile(r\"\\s*<sparkle:version>(.*?)</sparkle:version>\", re.DOTALL)", "enclosure_without_version_pattern = re.compile(r\"<enclosure\\b(?![^>]*\\bsparkle:version=)\")", "", "def transform_item(match):", "    start, body, end = match.groups()", "    versions = version_pattern.findall(body)", "    if not versions:", "        return match.group(0)", "    version = escape(unescape(versions[0].strip()), dict([(\"\\\"\", \"&quot;\")]))", "    body = version_pattern.sub(\"\", body)", "    if \"sparkle:version=\" not in body:", "        body, count = enclosure_without_version_pattern.subn(f\"<enclosure sparkle:version=\\\"{version}\\\"\", body, count=1)", "        if count != 1:", "            raise SystemExit(\"Missing enclosure for sparkle:version\")", "    return f\"{start}{body}{end}\"", "", "text = item_pattern.sub(transform_item, text)", "path.write_text(text)"]))' "$(DIST_DIR)/appcast.xml"
+verify-dmg: release-dmg
+	test -f "$(RELEASE_DMG)"
+	scripts/verify-dmg.sh "$(RELEASE_DMG)"
+	@mount_dir="$$(mktemp -d /tmp/$(APP_NAME).dmg.XXXXXX)"; \
+	cleanup() { hdiutil detach "$$mount_dir" >/dev/null 2>&1 || hdiutil detach -force "$$mount_dir" >/dev/null 2>&1 || true; rm -rf "$$mount_dir"; }; \
+	trap cleanup EXIT; \
+	hdiutil attach "$(RELEASE_DMG)" -mountpoint "$$mount_dir" -nobrowse -quiet; \
+	test -d "$$mount_dir/$(PROD_APP_NAME).app" || { echo "Missing app in DMG"; exit 1; }; \
+	codesign --verify --deep --strict --verbose=2 "$$mount_dir/$(PROD_APP_NAME).app"; \
+	echo "DMG verification passed"
+
+sign-dmg:
+	test -f "$(RELEASE_DMG)" || { echo "Missing DMG: $(RELEASE_DMG)"; exit 1; }
+	codesign --force --sign "$(CODESIGN_IDENTITY)" "$(RELEASE_DMG)"
+	@echo "Signed $(RELEASE_DMG)"
+
+appcast: release-dmg
+	$(MAKE) sign-dmg CODESIGN_IDENTITY="$(CODESIGN_IDENTITY)"
+	RELEASE_TAG="v$(VERSION)" VERSION="$(VERSION)" BUILD_NUMBER="$(BUILD_NUMBER)" DMG_PATH="$(RELEASE_DMG)" APPCAST_PATH="$(DIST_DIR)/appcast.xml" REPOSITORY="$(REPOSITORY)" scripts/generate-sparkle-appcast.sh
 	@echo "Created $(DIST_DIR)/appcast.xml"
 
-release: create-local-certificate generate-eddsa-key appcast release-dmg
+release: create-local-certificate check-eddsa-key appcast
 	@echo "Release archive: $(RELEASE_ARCHIVE)"
 	@echo "Release DMG: $(RELEASE_DMG)"
 	@echo "Appcast: $(DIST_DIR)/appcast.xml"
-	@echo "Publish $(RELEASE_ARCHIVE), $(RELEASE_DMG), and $(DIST_DIR)/appcast.xml as GitHub Release assets."
+	@echo "Publish $(RELEASE_DMG) and $(DIST_DIR)/appcast.xml as GitHub Release assets."
 
 dev-build:
 	$(MAKE) sign APP_NAME="$(DEV_APP_NAME)" BUNDLE_ID="$(DEV_BUNDLE_ID)" BUILD_DIR="$(DEV_BUILD_DIR)"
