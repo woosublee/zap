@@ -1,8 +1,8 @@
 PRODUCT_NAME ?= Zap
 APP_NAME ?= Zap
 BUNDLE_ID ?= com.woosublee.zap
-VERSION ?= 0.1.4
-BUILD_NUMBER ?= 5
+VERSION ?= 0.1.5
+BUILD_NUMBER ?= 6
 BUILD_TAG ?= local-unknown
 BUILD_DIR ?= /tmp/zap-bundles/default
 CONFIGURATION ?= debug
