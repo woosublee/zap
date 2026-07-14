@@ -8,6 +8,10 @@ struct MenuBarView: View {
     let quit: () -> Void
 
     var body: some View {
+        hotKeyControls
+
+        Divider()
+
         quickLaunchMenu
         windowControlMenu
 
@@ -27,6 +31,45 @@ struct MenuBarView: View {
         }
         Button("Quit \(AboutPresentation.currentAppName)") {
             quit()
+        }
+    }
+
+    @ViewBuilder
+    private var hotKeyControls: some View {
+        if model.areHotKeysPaused {
+            Button("Resume Shortcuts") {
+                model.resumeHotKeys()
+            }
+        } else {
+            Menu("Pause Shortcuts") {
+                Button("For 10 Minutes") {
+                    model.pauseHotKeys(for: 10 * 60)
+                }
+                Button("For 30 Minutes") {
+                    model.pauseHotKeys(for: 30 * 60)
+                }
+                Button("For 1 Hour") {
+                    model.pauseHotKeys(for: 60 * 60)
+                }
+                Button("For 2 Hours") {
+                    model.pauseHotKeys(for: 2 * 60 * 60)
+                }
+                Button("For 4 Hours") {
+                    model.pauseHotKeys(for: 4 * 60 * 60)
+                }
+
+                Divider()
+
+                Button("Until Resumed") {
+                    model.pauseHotKeysIndefinitely()
+                }
+            }
+        }
+
+        if let application = model.activeApplication {
+            Button("\(model.isActiveApplicationDisabled ? "Enable" : "Disable") Shortcuts in \(application.name)") {
+                model.toggleHotKeysForActiveApplication()
+            }
         }
     }
 

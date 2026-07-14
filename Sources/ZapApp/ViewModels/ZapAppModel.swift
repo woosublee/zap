@@ -3,6 +3,50 @@ import Foundation
 import SwiftUI
 import ZapCore
 
+struct ActiveApplication: Equatable {
+    let name: String
+    let bundleIdentifier: String
+
+    static var current: ActiveApplication? {
+        guard let application = NSWorkspace.shared.frontmostApplication,
+              let bundleIdentifier = application.bundleIdentifier else {
+            return nil
+        }
+        return ActiveApplication(
+            name: application.localizedName ?? bundleIdentifier,
+            bundleIdentifier: bundleIdentifier
+        )
+    }
+}
+
+protocol HotKeyPauseScheduling: AnyObject {
+    func schedule(after interval: TimeInterval, action: @escaping () -> Void)
+    func cancel()
+}
+
+final class TimerHotKeyPauseScheduler: HotKeyPauseScheduling {
+    private var timer: Timer?
+
+    func schedule(after interval: TimeInterval, action: @escaping () -> Void) {
+        cancel()
+        guard interval > 0 else {
+            action()
+            return
+        }
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            self?.timer = nil
+            action()
+        }
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    func cancel() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
 @MainActor
 final class ZapAppModel: ObservableObject {
     @Published private(set) var dockItems: [DockItem] = []
@@ -15,11 +59,16 @@ final class ZapAppModel: ObservableObject {
     @Published private(set) var registrationError: String?
     @Published private(set) var loginItemError: String?
     @Published private(set) var inputSourceRevision = 0
+    @Published private(set) var pausedUntil: Date?
+    @Published private(set) var isPausedIndefinitely: Bool
+    @Published private(set) var activeApplication: ActiveApplication?
+    @Published private(set) var disabledApplications: [String: String]
 
     let windowManagementModel: WindowManagementModel
 
     private var inputSourceObserver: NSObjectProtocol?
     private var appReopenObserver: NSObjectProtocol?
+    private var applicationActivationObserver: NSObjectProtocol?
 
     @Published var isFinderShortcutEnabled: Bool {
         didSet {
@@ -46,6 +95,11 @@ final class ZapAppModel: ObservableObject {
     private let appLauncher: any AppLaunching
     private let loginItemService: any LoginItemControlling
     private let updateService: UpdateService
+    private let userDefaults: UserDefaults
+    private let now: () -> Date
+    private let activeApplicationProvider: () -> ActiveApplication?
+    private let workspaceNotificationCenter: NotificationCenter
+    private let pauseScheduler: any HotKeyPauseScheduling
     private let hotKeyServiceFactory: (
         @escaping (NumberKey) -> Void,
         @escaping () -> Void,
@@ -81,6 +135,11 @@ final class ZapAppModel: ObservableObject {
         loginItemService: any LoginItemControlling = LoginItemService(),
         updateService: UpdateService,
         windowManagementModel: WindowManagementModel? = nil,
+        userDefaults: UserDefaults = .standard,
+        now: @escaping () -> Date = Date.init,
+        activeApplicationProvider: @escaping () -> ActiveApplication? = { ActiveApplication.current },
+        workspaceNotificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter,
+        pauseScheduler: any HotKeyPauseScheduling = TimerHotKeyPauseScheduler(),
         hotKeyServiceFactory: @escaping (
             @escaping (NumberKey) -> Void,
             @escaping () -> Void,
@@ -100,11 +159,30 @@ final class ZapAppModel: ObservableObject {
         self.loginItemService = loginItemService
         self.updateService = updateService
         self.windowManagementModel = windowManagementModel ?? WindowManagementModel()
+        self.userDefaults = userDefaults
+        self.now = now
+        self.activeApplicationProvider = activeApplicationProvider
+        self.workspaceNotificationCenter = workspaceNotificationCenter
+        self.pauseScheduler = pauseScheduler
         self.hotKeyServiceFactory = hotKeyServiceFactory
         self.manualShortcuts = Self.loadManualShortcuts()
         self.isFinderShortcutEnabled = UserDefaults.standard.bool(forKey: Self.finderShortcutEnabledKey)
         self.selectedModifiers = Self.loadModifiers()
         self.startAtLogin = UserDefaults.standard.bool(forKey: Self.startAtLoginKey)
+
+        let currentDate = now()
+        let isPausedIndefinitely = userDefaults.bool(forKey: Self.hotKeysPausedIndefinitelyKey)
+        let storedPausedUntil = userDefaults.object(forKey: Self.hotKeysPausedUntilKey) as? Date
+        self.isPausedIndefinitely = isPausedIndefinitely
+        self.pausedUntil = !isPausedIndefinitely && storedPausedUntil.map { $0 > currentDate } == true
+            ? storedPausedUntil
+            : nil
+        self.activeApplication = activeApplicationProvider()
+        self.disabledApplications = userDefaults.dictionary(forKey: Self.disabledApplicationsKey) as? [String: String] ?? [:]
+
+        if storedPausedUntil != nil && pausedUntil == nil {
+            userDefaults.removeObject(forKey: Self.hotKeysPausedUntilKey)
+        }
 
         self.windowManagementModel.onShortcutConfigurationChanged = { [weak self] in
             self?.registerHotKeys()
@@ -112,8 +190,10 @@ final class ZapAppModel: ObservableObject {
 
         refreshDockItems()
         registerHotKeys()
+        schedulePauseExpiration()
         observeInputSourceChanges()
         observeAppReopenRequests()
+        observeApplicationActivations()
     }
 
     deinit {
@@ -123,6 +203,56 @@ final class ZapAppModel: ObservableObject {
         if let appReopenObserver {
             NotificationCenter.default.removeObserver(appReopenObserver)
         }
+        if let applicationActivationObserver {
+            workspaceNotificationCenter.removeObserver(applicationActivationObserver)
+        }
+        pauseScheduler.cancel()
+    }
+
+    var areHotKeysPaused: Bool {
+        isPausedIndefinitely || pausedUntil.map { $0 > now() } == true
+    }
+
+    var isActiveApplicationDisabled: Bool {
+        guard let bundleIdentifier = activeApplication?.bundleIdentifier else { return false }
+        return disabledApplications[bundleIdentifier] != nil
+    }
+
+    func pauseHotKeys(for duration: TimeInterval) {
+        guard duration > 0 else { return }
+        isPausedIndefinitely = false
+        pausedUntil = now().addingTimeInterval(duration)
+        persistPauseState()
+        registerHotKeys()
+        schedulePauseExpiration()
+    }
+
+    func pauseHotKeysIndefinitely() {
+        pausedUntil = nil
+        isPausedIndefinitely = true
+        persistPauseState()
+        pauseScheduler.cancel()
+        registerHotKeys()
+    }
+
+    func resumeHotKeys() {
+        guard isPausedIndefinitely || pausedUntil != nil else { return }
+        pausedUntil = nil
+        isPausedIndefinitely = false
+        persistPauseState()
+        pauseScheduler.cancel()
+        registerHotKeys()
+    }
+
+    func toggleHotKeysForActiveApplication() {
+        guard let application = activeApplication else { return }
+        if disabledApplications[application.bundleIdentifier] != nil {
+            disabledApplications.removeValue(forKey: application.bundleIdentifier)
+        } else {
+            disabledApplications[application.bundleIdentifier] = application.name
+        }
+        userDefaults.set(disabledApplications, forKey: Self.disabledApplicationsKey)
+        registerHotKeys()
     }
 
     func refreshDockItems() {
@@ -218,12 +348,67 @@ final class ZapAppModel: ObservableObject {
     }
 
     private func registerHotKeys() {
+        if areHotKeysPaused || isActiveApplicationDisabled {
+            hotKeyService.unregister()
+            return
+        }
+
         registrationError = hotKeyService.register(
             modifiers: selectedModifiers,
             finderShortcutEnabled: isFinderShortcutEnabled,
             manualShortcuts: manualShortcuts,
             windowShortcuts: windowManagementModel.windowShortcutsForRegistration
         )
+    }
+
+    private func persistPauseState() {
+        userDefaults.set(isPausedIndefinitely, forKey: Self.hotKeysPausedIndefinitelyKey)
+        if let pausedUntil {
+            userDefaults.set(pausedUntil, forKey: Self.hotKeysPausedUntilKey)
+        } else {
+            userDefaults.removeObject(forKey: Self.hotKeysPausedUntilKey)
+        }
+    }
+
+    private func schedulePauseExpiration() {
+        pauseScheduler.cancel()
+        guard !isPausedIndefinitely, let pausedUntil else { return }
+        let interval = pausedUntil.timeIntervalSince(now())
+        guard interval > 0 else {
+            resumeHotKeys()
+            return
+        }
+        pauseScheduler.schedule(after: interval) { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.pausedUntil == pausedUntil else { return }
+                self.resumeHotKeys()
+            }
+        }
+    }
+
+    private func observeApplicationActivations() {
+        applicationActivationObserver = workspaceNotificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let wasDisabled = self.isActiveApplicationDisabled
+                if let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                   let bundleIdentifier = application.bundleIdentifier {
+                    self.activeApplication = ActiveApplication(
+                        name: application.localizedName ?? bundleIdentifier,
+                        bundleIdentifier: bundleIdentifier
+                    )
+                } else {
+                    self.activeApplication = self.activeApplicationProvider()
+                }
+                if wasDisabled != self.isActiveApplicationDisabled {
+                    self.registerHotKeys()
+                }
+            }
+        }
     }
 
     private func observeInputSourceChanges() {
@@ -301,4 +486,7 @@ final class ZapAppModel: ObservableObject {
     private static let finderShortcutEnabledKey = "finder_shortcut_enabled"
     private static let manualShortcutsKey = "manual_shortcuts"
     private static let startAtLoginKey = "start_at_login"
+    private static let hotKeysPausedUntilKey = "hot_keys_paused_until"
+    private static let hotKeysPausedIndefinitelyKey = "hot_keys_paused_indefinitely"
+    private static let disabledApplicationsKey = "disabled_hot_key_applications"
 }

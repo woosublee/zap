@@ -177,6 +177,155 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(hotKeyService.registrations[0].windowShortcuts, [])
     }
 
+    func testPausingAndResumingHotKeysUnregistersAndRestoresRegistration() async {
+        let hotKeyService = CapturingHotKeyService()
+        let scheduler = CapturingPauseScheduler()
+        let now = Date(timeIntervalSinceReferenceDate: 1_000)
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            now: { now },
+            pauseScheduler: scheduler
+        )
+        hotKeyService.registrations.removeAll()
+        hotKeyService.unregisterCallCount = 0
+
+        model.pauseHotKeys(for: 10 * 60)
+
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 1)
+        XCTAssertEqual(model.pausedUntil, now.addingTimeInterval(10 * 60))
+        XCTAssertEqual(scheduler.scheduledIntervals, [10 * 60])
+
+        scheduler.fire()
+        await Task.yield()
+        XCTAssertEqual(hotKeyService.registrations.count, 1)
+        XCTAssertFalse(model.areHotKeysPaused)
+
+        model.pauseHotKeysIndefinitely()
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 2)
+        XCTAssertTrue(model.isPausedIndefinitely)
+
+        model.resumeHotKeys()
+        XCTAssertEqual(hotKeyService.registrations.count, 2)
+        XCTAssertFalse(model.areHotKeysPaused)
+    }
+
+    func testDisabledActiveApplicationUnregistersAndOtherApplicationRestoresHotKeys() async {
+        let workspaceNotifications = NotificationCenter()
+        var currentApplication = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            activeApplicationProvider: { currentApplication },
+            workspaceNotificationCenter: workspaceNotifications
+        )
+        hotKeyService.registrations.removeAll()
+        hotKeyService.unregisterCallCount = 0
+
+        model.toggleHotKeysForActiveApplication()
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 1)
+        XCTAssertTrue(model.isActiveApplicationDisabled)
+
+        currentApplication = ActiveApplication(name: "Notes", bundleIdentifier: "com.apple.Notes")
+        workspaceNotifications.post(name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        await Task.yield()
+
+        XCTAssertEqual(model.activeApplication, currentApplication)
+        XCTAssertEqual(hotKeyService.registrations.count, 1)
+
+        currentApplication = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        workspaceNotifications.post(name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        await Task.yield()
+
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 2)
+        XCTAssertTrue(model.isActiveApplicationDisabled)
+    }
+
+    func testPausedStateAndDisabledApplicationsRestoreFromUserDefaults() {
+        let suiteName = "ZapAppModelHotKeyIntegrationTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Date(timeIntervalSinceReferenceDate: 2_000)
+        let pausedUntil = now.addingTimeInterval(30 * 60)
+        defaults.set(pausedUntil, forKey: "hot_keys_paused_until")
+        defaults.set(["com.apple.Safari": "Safari"], forKey: "disabled_hot_key_applications")
+        let hotKeyService = CapturingHotKeyService()
+
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults,
+            now: { now },
+            activeApplicationProvider: { ActiveApplication(name: "Notes", bundleIdentifier: "com.apple.Notes") }
+        )
+
+        XCTAssertEqual(model.pausedUntil, pausedUntil)
+        XCTAssertEqual(model.disabledApplications, ["com.apple.Safari": "Safari"])
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 1)
+    }
+
+    func testExpiredPausedStateIsClearedOnLaunch() {
+        let suiteName = "ZapAppModelHotKeyIntegrationTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Date(timeIntervalSinceReferenceDate: 3_000)
+        defaults.set(now.addingTimeInterval(-1), forKey: "hot_keys_paused_until")
+        let hotKeyService = CapturingHotKeyService()
+
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults,
+            now: { now }
+        )
+
+        XCTAssertNil(model.pausedUntil)
+        XCTAssertNil(defaults.object(forKey: "hot_keys_paused_until"))
+        XCTAssertEqual(hotKeyService.registrations.count, 1)
+    }
+
+    func testDirectMenuActionsRemainAvailableWhileHotKeysArePaused() {
+        let dockItem = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let launcher = CapturingAppLauncher()
+        let windowPerformer = CapturingWindowManagementPerformer()
+        let windowModel = WindowManagementModel(
+            service: windowPerformer,
+            shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+        )
+        let model = makeModel(
+            dockItems: [dockItem],
+            appLauncher: launcher,
+            windowManagementModel: windowModel,
+            hotKeyService: CapturingHotKeyService()
+        )
+
+        model.pauseHotKeysIndefinitely()
+        model.activateDockItem(for: .one)
+        model.activateFinder()
+        _ = model.windowManagementModel.perform(action: .leftHalf)
+
+        XCTAssertEqual(launcher.activatedItems, [dockItem])
+        XCTAssertEqual(launcher.activateFinderCallCount, 1)
+        XCTAssertEqual(windowPerformer.performedActions, [.leftHalf])
+    }
+
     func testHotKeyRegistrationErrorAndWindowShortcutValidationErrorRemainSeparate() {
         let windowModel = WindowManagementModel(
             service: CapturingWindowManagementPerformer(),
@@ -196,7 +345,12 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         dockItems: [DockItem] = [],
         appLauncher: CapturingAppLauncher = CapturingAppLauncher(),
         windowManagementModel: WindowManagementModel,
-        hotKeyService: CapturingHotKeyService
+        hotKeyService: CapturingHotKeyService,
+        userDefaults: UserDefaults = .standard,
+        now: @escaping () -> Date = Date.init,
+        activeApplicationProvider: @escaping () -> ActiveApplication? = { nil },
+        workspaceNotificationCenter: NotificationCenter = NotificationCenter(),
+        pauseScheduler: any HotKeyPauseScheduling = CapturingPauseScheduler()
     ) -> ZapAppModel {
         ZapAppModel(
             dockItemProvider: StubDockItemProvider(items: dockItems),
@@ -204,6 +358,11 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
             loginItemService: StubLoginItemService(),
             updateService: UpdateService(driverFactory: { StubUpdateDriver() }, buildTagProvider: { nil }),
             windowManagementModel: windowManagementModel,
+            userDefaults: userDefaults,
+            now: now,
+            activeApplicationProvider: activeApplicationProvider,
+            workspaceNotificationCenter: workspaceNotificationCenter,
+            pauseScheduler: pauseScheduler,
             hotKeyServiceFactory: { onDockHotKey, onFinderHotKey, onManualHotKey, onWindowHotKey in
                 hotKeyService.onDockHotKey = onDockHotKey
                 hotKeyService.onFinderHotKey = onFinderHotKey
@@ -254,9 +413,29 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
     }
 
     private func clearZapAppModelDefaults() {
-        for key in ["shortcut_modifiers", "finder_shortcut_enabled", "manual_shortcuts", "start_at_login", "window_shortcuts", "window_management_enabled"] {
+        for key in ["shortcut_modifiers", "finder_shortcut_enabled", "manual_shortcuts", "start_at_login", "window_shortcuts", "window_management_enabled", "hot_keys_paused_until", "hot_keys_paused_indefinitely", "disabled_hot_key_applications"] {
             UserDefaults.standard.removeObject(forKey: key)
         }
+    }
+}
+
+private final class CapturingPauseScheduler: HotKeyPauseScheduling {
+    var scheduledIntervals: [TimeInterval] = []
+    private var action: (() -> Void)?
+
+    func schedule(after interval: TimeInterval, action: @escaping () -> Void) {
+        scheduledIntervals.append(interval)
+        self.action = action
+    }
+
+    func cancel() {
+        action = nil
+    }
+
+    func fire() {
+        let action = action
+        self.action = nil
+        action?()
     }
 }
 

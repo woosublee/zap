@@ -33,6 +33,24 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(source.contains("Button(\"Quit \\(AboutPresentation.currentAppName)\")"))
     }
 
+    func testMenuBarIncludesShortcutPauseAndCurrentApplicationControls() throws {
+        let source = try menuBarSource
+
+        XCTAssertTrue(source.contains("Menu(\"Pause Shortcuts\")"))
+        XCTAssertTrue(source.contains("Button(\"For 10 Minutes\")"))
+        XCTAssertTrue(source.contains("Button(\"For 30 Minutes\")"))
+        XCTAssertTrue(source.contains("Button(\"For 1 Hour\")"))
+        XCTAssertTrue(source.contains("Button(\"For 2 Hours\")"))
+        XCTAssertTrue(source.contains("Button(\"For 4 Hours\")"))
+        XCTAssertTrue(source.contains("Button(\"Until Resumed\")"))
+        XCTAssertTrue(source.contains("Button(\"Resume Shortcuts\")"))
+        XCTAssertTrue(source.contains("model.pauseHotKeys(for:"))
+        XCTAssertTrue(source.contains("model.pauseHotKeysIndefinitely()"))
+        XCTAssertTrue(source.contains("model.resumeHotKeys()"))
+        XCTAssertTrue(source.contains("model.activeApplication"))
+        XCTAssertTrue(source.contains("model.toggleHotKeysForActiveApplication()"))
+    }
+
     func testMenuBarQuickLaunchSubmenuKeepsFinderManualAndDockActions() throws {
         let source = try menuBarSource
 
