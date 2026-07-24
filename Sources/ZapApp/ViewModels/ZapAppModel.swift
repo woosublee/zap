@@ -63,6 +63,7 @@ final class ZapAppModel: ObservableObject {
     @Published private(set) var isPausedIndefinitely: Bool
     @Published private(set) var activeApplication: ActiveApplication?
     @Published private(set) var disabledApplications: [String: String]
+    @Published private(set) var activeApplicationToggleShortcut: ActiveApplicationToggleShortcut
 
     let windowManagementModel: WindowManagementModel
 
@@ -104,7 +105,8 @@ final class ZapAppModel: ObservableObject {
         @escaping (NumberKey) -> Void,
         @escaping () -> Void,
         @escaping (UUID) -> Void,
-        @escaping (WindowAction) -> Void
+        @escaping (WindowAction) -> Void,
+        @escaping () -> Void
     ) -> any GlobalHotKeyServicing
     private lazy var hotKeyService: any GlobalHotKeyServicing = hotKeyServiceFactory(
         { [weak self] key in
@@ -126,6 +128,11 @@ final class ZapAppModel: ObservableObject {
             Task { @MainActor [weak self] in
                 _ = self?.windowManagementModel.perform(action: action)
             }
+        },
+        { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.toggleHotKeysForActiveApplication()
+            }
         }
     )
 
@@ -144,13 +151,21 @@ final class ZapAppModel: ObservableObject {
             @escaping (NumberKey) -> Void,
             @escaping () -> Void,
             @escaping (UUID) -> Void,
-            @escaping (WindowAction) -> Void
-        ) -> any GlobalHotKeyServicing = { onDockHotKey, onFinderHotKey, onManualHotKey, onWindowHotKey in
+            @escaping (WindowAction) -> Void,
+            @escaping () -> Void
+        ) -> any GlobalHotKeyServicing = {
+            onDockHotKey,
+            onFinderHotKey,
+            onManualHotKey,
+            onWindowHotKey,
+            onActiveApplicationToggleHotKey in
+
             GlobalHotKeyService(
                 onDockHotKey: onDockHotKey,
                 onFinderHotKey: onFinderHotKey,
                 onManualHotKey: onManualHotKey,
-                onWindowHotKey: onWindowHotKey
+                onWindowHotKey: onWindowHotKey,
+                onActiveApplicationToggleHotKey: onActiveApplicationToggleHotKey
             )
         }
     ) {
@@ -179,6 +194,9 @@ final class ZapAppModel: ObservableObject {
             : nil
         self.activeApplication = activeApplicationProvider()
         self.disabledApplications = userDefaults.dictionary(forKey: Self.disabledApplicationsKey) as? [String: String] ?? [:]
+        self.activeApplicationToggleShortcut = Self.loadActiveApplicationToggleShortcut(
+            from: userDefaults
+        )
 
         if storedPausedUntil != nil && pausedUntil == nil {
             userDefaults.removeObject(forKey: Self.hotKeysPausedUntilKey)
@@ -267,6 +285,28 @@ final class ZapAppModel: ObservableObject {
         }
     }
 
+    func setActiveApplicationToggleShortcut(
+        keyCode: UInt32,
+        keyDisplayName: String,
+        modifiers: Set<ShortcutModifier>
+    ) {
+        guard !modifiers.isEmpty else { return }
+
+        activeApplicationToggleShortcut = ActiveApplicationToggleShortcut(
+            keyCode: keyCode,
+            keyDisplayName: keyDisplayName,
+            modifiers: modifiers
+        )
+        persistActiveApplicationToggleShortcut()
+        registerHotKeys()
+    }
+
+    func clearActiveApplicationToggleShortcut() {
+        activeApplicationToggleShortcut = .unset
+        userDefaults.removeObject(forKey: Self.activeApplicationToggleShortcutKey)
+        registerHotKeys()
+    }
+
     func dockItem(for key: NumberKey) -> DockItem? {
         guard dockItems.indices.contains(key.dockIndex) else { return nil }
         return dockItems[key.dockIndex]
@@ -348,16 +388,22 @@ final class ZapAppModel: ObservableObject {
     }
 
     private func registerHotKeys() {
-        if areHotKeysPaused || isActiveApplicationDisabled {
+        if areHotKeysPaused {
             hotKeyService.unregister()
             return
         }
+
+        let scope: GlobalHotKeyRegistrationScope = isActiveApplicationDisabled
+            ? .activeApplicationToggleOnly
+            : .all
 
         registrationError = hotKeyService.register(
             modifiers: selectedModifiers,
             finderShortcutEnabled: isFinderShortcutEnabled,
             manualShortcuts: manualShortcuts,
-            windowShortcuts: windowManagementModel.windowShortcutsForRegistration
+            windowShortcuts: windowManagementModel.windowShortcutsForRegistration,
+            activeApplicationToggleShortcut: activeApplicationToggleShortcut,
+            scope: scope
         )
     }
 
@@ -465,6 +511,39 @@ final class ZapAppModel: ObservableObject {
         UserDefaults.standard.set(data, forKey: Self.manualShortcutsKey)
     }
 
+    private func persistActiveApplicationToggleShortcut() {
+        guard let data = try? JSONEncoder().encode(activeApplicationToggleShortcut) else {
+            return
+        }
+
+        userDefaults.set(data, forKey: Self.activeApplicationToggleShortcutKey)
+    }
+
+    private static func loadActiveApplicationToggleShortcut(
+        from userDefaults: UserDefaults
+    ) -> ActiveApplicationToggleShortcut {
+        guard let storedValue = userDefaults.object(
+            forKey: activeApplicationToggleShortcutKey
+        ) else {
+            return .unset
+        }
+
+        guard let data = storedValue as? Data else {
+            userDefaults.removeObject(forKey: activeApplicationToggleShortcutKey)
+            return .unset
+        }
+
+        guard let shortcut = try? JSONDecoder().decode(
+            ActiveApplicationToggleShortcut.self,
+            from: data
+        ), shortcut.canRegister else {
+            userDefaults.removeObject(forKey: activeApplicationToggleShortcutKey)
+            return .unset
+        }
+
+        return shortcut
+    }
+
     private static func loadModifiers() -> Set<ShortcutModifier> {
         guard let rawValues = UserDefaults.standard.stringArray(forKey: modifiersKey) else {
             return ShortcutModifier.defaultSelection
@@ -489,4 +568,6 @@ final class ZapAppModel: ObservableObject {
     private static let hotKeysPausedUntilKey = "hot_keys_paused_until"
     private static let hotKeysPausedIndefinitelyKey = "hot_keys_paused_indefinitely"
     private static let disabledApplicationsKey = "disabled_hot_key_applications"
+    private static let activeApplicationToggleShortcutKey =
+        "active_application_toggle_shortcut"
 }

@@ -44,6 +44,79 @@ final class GlobalHotKeyDispatchMappingTests: XCTestCase {
         XCTAssertEqual(receivedActions, [.fullscreen])
     }
 
+    func testDispatchActiveApplicationToggleIDInvokesOnlyToggleCallback() {
+        let expectation = expectation(
+            description: "Active application toggle callback"
+        )
+        var toggleCallCount = 0
+
+        let service = makeRegisteredService(
+            activeApplicationToggleShortcut: ActiveApplicationToggleShortcut(
+                keyCode: 17,
+                keyDisplayName: "T",
+                modifiers: [.control, .option]
+            ),
+            onDockHotKey: { _ in
+                XCTFail("Control ID must not invoke Dock callback.")
+            },
+            onFinderHotKey: {
+                XCTFail("Control ID must not invoke Finder callback.")
+            },
+            onManualHotKey: { _ in
+                XCTFail("Control ID must not invoke manual callback.")
+            },
+            onWindowHotKey: { _ in
+                XCTFail("Control ID must not invoke window callback.")
+            },
+            onActiveApplicationToggleHotKey: {
+                toggleCallCount += 1
+                expectation.fulfill()
+            }
+        )
+
+        XCTAssertTrue(service.dispatchHotKey(id: 3000))
+
+        wait(for: [expectation], timeout: 1.0)
+        XCTAssertEqual(toggleCallCount, 1)
+    }
+
+    func testActiveApplicationToggleCarbonFailureUsesRegistrationError() {
+        let service = GlobalHotKeyService(
+            onDockHotKey: { _ in },
+            onFinderHotKey: {},
+            onManualHotKey: { _ in },
+            onWindowHotKey: { _ in },
+            onActiveApplicationToggleHotKey: {},
+            registerHotKey: { hotKey in
+                if hotKey.owner == .activeApplicationToggle {
+                    return HotKeyRegistrationResult(
+                        status: OSStatus(-9876),
+                        ref: nil
+                    )
+                }
+                return HotKeyRegistrationResult(status: noErr, ref: nil)
+            }
+        )
+
+        let error = service.register(
+            modifiers: [.option],
+            finderShortcutEnabled: false,
+            manualShortcuts: [],
+            windowShortcuts: [],
+            activeApplicationToggleShortcut: ActiveApplicationToggleShortcut(
+                keyCode: 17,
+                keyDisplayName: "T",
+                modifiers: [.control]
+            ),
+            scope: .all
+        )
+
+        XCTAssertEqual(
+            error,
+            "Toggle Zap for Current App shortcut could not be registered: -9876"
+        )
+    }
+
     func testFinderIDsStillInvokeOnlyFinderCallback() {
         let expectation = expectation(description: "Finder hotkey callback")
         var finderCallCount = 0
@@ -123,23 +196,29 @@ final class GlobalHotKeyDispatchMappingTests: XCTestCase {
         finderShortcutEnabled: Bool = false,
         manualShortcuts: [ManualShortcut] = [],
         windowShortcuts: [WindowShortcut] = [],
+        activeApplicationToggleShortcut: ActiveApplicationToggleShortcut = .unset,
+        scope: GlobalHotKeyRegistrationScope = .all,
         onDockHotKey: @escaping (NumberKey) -> Void = { _ in },
         onFinderHotKey: @escaping () -> Void = {},
         onManualHotKey: @escaping (UUID) -> Void = { _ in },
-        onWindowHotKey: @escaping (WindowAction) -> Void = { _ in }
+        onWindowHotKey: @escaping (WindowAction) -> Void = { _ in },
+        onActiveApplicationToggleHotKey: @escaping () -> Void = {}
     ) -> GlobalHotKeyService {
         let service = GlobalHotKeyService(
             onDockHotKey: onDockHotKey,
             onFinderHotKey: onFinderHotKey,
             onManualHotKey: onManualHotKey,
             onWindowHotKey: onWindowHotKey,
+            onActiveApplicationToggleHotKey: onActiveApplicationToggleHotKey,
             registerHotKey: { _ in HotKeyRegistrationResult(status: noErr, ref: nil) }
         )
         _ = service.register(
             modifiers: [.option],
             finderShortcutEnabled: finderShortcutEnabled,
             manualShortcuts: manualShortcuts,
-            windowShortcuts: windowShortcuts
+            windowShortcuts: windowShortcuts,
+            activeApplicationToggleShortcut: activeApplicationToggleShortcut,
+            scope: scope
         )
         return service
     }

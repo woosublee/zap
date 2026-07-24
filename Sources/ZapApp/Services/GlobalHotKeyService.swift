@@ -15,10 +15,16 @@ struct PlannedHotKey: Equatable {
 }
 
 enum PlannedHotKeyOwner: Equatable {
+    case activeApplicationToggle
     case finder
     case dock(NumberKey)
     case manual(UUID, name: String)
     case window(WindowAction, title: String)
+}
+
+enum GlobalHotKeyRegistrationScope: Equatable {
+    case all
+    case activeApplicationToggleOnly
 }
 
 struct HotKeyRegistrationPlan: Equatable {
@@ -36,7 +42,9 @@ protocol GlobalHotKeyServicing: AnyObject {
         modifiers: Set<ShortcutModifier>,
         finderShortcutEnabled: Bool,
         manualShortcuts: [ManualShortcut],
-        windowShortcuts: [WindowShortcut]
+        windowShortcuts: [WindowShortcut],
+        activeApplicationToggleShortcut: ActiveApplicationToggleShortcut,
+        scope: GlobalHotKeyRegistrationScope
     ) -> String?
 
     func unregister()
@@ -50,18 +58,43 @@ struct GlobalHotKeyRegistrationPlanner {
         (UInt32(kVK_ISO_Section), 103)
     ]
 
+    static let activeApplicationToggleHotKeyID: UInt32 = 3000
+
     func plan(
         modifiers: Set<ShortcutModifier>,
         finderShortcutEnabled: Bool,
         manualShortcuts: [ManualShortcut],
-        windowShortcuts: [WindowShortcut]
+        windowShortcuts: [WindowShortcut],
+        activeApplicationToggleShortcut: ActiveApplicationToggleShortcut = .unset,
+        scope: GlobalHotKeyRegistrationScope = .all
     ) -> HotKeyRegistrationPlan {
         var plannedHotKeys: [PlannedHotKey] = []
         var errors: [String] = []
         var registeredCombos = Set<HotKeyCombo>()
 
+        planActiveApplicationToggle(
+            activeApplicationToggleShortcut,
+            into: &plannedHotKeys,
+            registeredCombos: &registeredCombos
+        )
+
+        guard scope == .all else {
+            return HotKeyRegistrationPlan(
+                hotKeys: plannedHotKeys,
+                errors: errors
+            )
+        }
+
         if finderShortcutEnabled {
-            planFinderHotKeys(into: &plannedHotKeys, registeredCombos: &registeredCombos)
+            let finderFailures = planFinderHotKeys(
+                into: &plannedHotKeys,
+                registeredCombos: &registeredCombos
+            )
+            if !finderFailures.isEmpty {
+                errors.append(
+                    "Finder shortcut could not be registered for all ₩/` variants: \(finderFailures.joined(separator: ", "))"
+                )
+            }
         }
 
         if modifiers.isEmpty {
@@ -98,14 +131,44 @@ struct GlobalHotKeyRegistrationPlanner {
         return HotKeyRegistrationPlan(hotKeys: plannedHotKeys, errors: errors)
     }
 
-    private func planFinderHotKeys(
+    private func planActiveApplicationToggle(
+        _ shortcut: ActiveApplicationToggleShortcut,
         into plannedHotKeys: inout [PlannedHotKey],
         registeredCombos: inout Set<HotKeyCombo>
     ) {
+        guard shortcut.canRegister,
+              let keyCode = shortcut.keyCode else {
+            return
+        }
+
+        let modifiers = Self.carbonModifiers(for: shortcut.modifiers)
+        let combo = HotKeyCombo(
+            keyCode: keyCode,
+            modifiers: modifiers
+        )
+
+        plannedHotKeys.append(PlannedHotKey(
+            id: Self.activeApplicationToggleHotKeyID,
+            keyCode: keyCode,
+            modifiers: modifiers,
+            owner: .activeApplicationToggle
+        ))
+        registeredCombos.insert(combo)
+    }
+
+    private func planFinderHotKeys(
+        into plannedHotKeys: inout [PlannedHotKey],
+        registeredCombos: inout Set<HotKeyCombo>
+    ) -> [String] {
         let modifiers = UInt32(optionKey)
+        var failures: [String] = []
+
         for hotKey in Self.finderHotKeys {
             let combo = HotKeyCombo(keyCode: hotKey.keyCode, modifiers: modifiers)
-            guard !registeredCombos.contains(combo) else { continue }
+            if registeredCombos.contains(combo) {
+                failures.append("\(Self.finderShortcutDisplayName(for: hotKey.keyCode)) (conflict)")
+                continue
+            }
             plannedHotKeys.append(PlannedHotKey(
                 id: hotKey.id,
                 keyCode: hotKey.keyCode,
@@ -113,6 +176,18 @@ struct GlobalHotKeyRegistrationPlanner {
                 owner: .finder
             ))
             registeredCombos.insert(combo)
+        }
+
+        return failures
+    }
+
+    private static func finderShortcutDisplayName(for keyCode: UInt32) -> String {
+        switch keyCode {
+        case UInt32(kVK_ANSI_Grave): "`"
+        case UInt32(kVK_JIS_Yen): "¥"
+        case UInt32(kVK_ANSI_Backslash): "\\"
+        case UInt32(kVK_ISO_Section): "§"
+        default: "Key\(keyCode)"
         }
     }
 
@@ -226,6 +301,7 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
     private let onFinderHotKey: () -> Void
     private let onManualHotKey: (UUID) -> Void
     private let onWindowHotKey: (WindowAction) -> Void
+    private let onActiveApplicationToggleHotKey: () -> Void
     private let planner: GlobalHotKeyRegistrationPlanner
     private let registerHotKey: (PlannedHotKey) -> HotKeyRegistrationResult
     private var hotKeyRefs: [EventHotKeyRef] = []
@@ -238,6 +314,7 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
         onFinderHotKey: @escaping () -> Void,
         onManualHotKey: @escaping (UUID) -> Void,
         onWindowHotKey: @escaping (WindowAction) -> Void,
+        onActiveApplicationToggleHotKey: @escaping () -> Void,
         planner: GlobalHotKeyRegistrationPlanner = GlobalHotKeyRegistrationPlanner(),
         registerHotKey: @escaping (PlannedHotKey) -> HotKeyRegistrationResult = GlobalHotKeyService.registerCarbonHotKey
     ) {
@@ -245,6 +322,7 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
         self.onFinderHotKey = onFinderHotKey
         self.onManualHotKey = onManualHotKey
         self.onWindowHotKey = onWindowHotKey
+        self.onActiveApplicationToggleHotKey = onActiveApplicationToggleHotKey
         self.planner = planner
         self.registerHotKey = registerHotKey
         installHandler()
@@ -261,7 +339,9 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
         modifiers: Set<ShortcutModifier>,
         finderShortcutEnabled: Bool,
         manualShortcuts: [ManualShortcut],
-        windowShortcuts: [WindowShortcut] = []
+        windowShortcuts: [WindowShortcut] = [],
+        activeApplicationToggleShortcut: ActiveApplicationToggleShortcut,
+        scope: GlobalHotKeyRegistrationScope
     ) -> String? {
         unregister()
 
@@ -269,9 +349,12 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
             modifiers: modifiers,
             finderShortcutEnabled: finderShortcutEnabled,
             manualShortcuts: manualShortcuts,
-            windowShortcuts: windowShortcuts
+            windowShortcuts: windowShortcuts,
+            activeApplicationToggleShortcut: activeApplicationToggleShortcut,
+            scope: scope
         )
         var errors = plan.errors
+        var activeApplicationToggleFailures: [String] = []
         var finderFailures: [String] = []
         var dockFailures: [String] = []
         var manualFailures: [String] = []
@@ -286,6 +369,8 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
                 registerSuccessfulOwner(for: hotKey)
             } else {
                 switch hotKey.owner {
+                case .activeApplicationToggle:
+                    activeApplicationToggleFailures.append("\(result.status)")
                 case .finder:
                     finderFailures.append("\(hotKey.keyCode) (\(result.status))")
                 case let .dock(key):
@@ -298,6 +383,12 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
             }
         }
 
+        if !activeApplicationToggleFailures.isEmpty {
+            errors.append(
+                "Toggle Zap for Current App shortcut could not be registered: "
+                    + activeApplicationToggleFailures.joined(separator: ", ")
+            )
+        }
         if !finderFailures.isEmpty {
             errors.append("Finder shortcut could not be registered for all ₩/` variants: \(finderFailures.joined(separator: ", "))")
         }
@@ -325,6 +416,13 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
 
     @discardableResult
     func dispatchHotKey(id: UInt32) -> Bool {
+        if id == GlobalHotKeyRegistrationPlanner.activeApplicationToggleHotKeyID {
+            DispatchQueue.main.async { [onActiveApplicationToggleHotKey] in
+                onActiveApplicationToggleHotKey()
+            }
+            return true
+        }
+
         if Self.finderHotKeyIDs.contains(id) {
             DispatchQueue.main.async { [onFinderHotKey] in
                 onFinderHotKey()
@@ -358,7 +456,7 @@ final class GlobalHotKeyService: GlobalHotKeyServicing {
 
     private func registerSuccessfulOwner(for hotKey: PlannedHotKey) {
         switch hotKey.owner {
-        case .finder, .dock:
+        case .activeApplicationToggle, .finder, .dock:
             break
         case let .manual(id, _):
             manualHotKeyIDs[hotKey.id] = id

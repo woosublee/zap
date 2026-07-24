@@ -20,6 +20,22 @@ final class ShortcutRecorderViewTests: XCTestCase {
         XCTAssertTrue(source.contains("guard !modifiers.isEmpty else"))
     }
 
+    func testShortcutRecorderSupportsActiveApplicationToggleCopy() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent(
+                "Sources/ZapApp/Views/ShortcutRecorderView.swift"
+            ))
+
+        XCTAssertTrue(source.contains(
+            "activeApplicationToggleOnRecord"
+        ))
+        XCTAssertTrue(source.contains("Record Shortcut Control"))
+        XCTAssertTrue(source.contains(
+            "Press the global shortcut that disables or re-enables Zap for the currently active app."
+        ))
+        XCTAssertTrue(source.contains("Press toggle shortcut"))
+    }
+
     func testWindowShortcutRecorderReportsRecordingLifecycle() throws {
         let rowSource = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/WindowShortcutRowView.swift"))

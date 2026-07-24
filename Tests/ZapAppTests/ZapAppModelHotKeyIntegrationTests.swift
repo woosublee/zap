@@ -36,6 +36,177 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(hotKeyService.registrations[0].windowShortcuts, windowShortcuts)
     }
 
+    func testActiveApplicationToggleShortcutStartsUnset() {
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService
+        )
+
+        XCTAssertEqual(model.activeApplicationToggleShortcut, .unset)
+        XCTAssertEqual(
+            hotKeyService.registrations.last?.activeApplicationToggleShortcut,
+            .unset
+        )
+        XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
+    }
+
+    func testSettingActiveApplicationToggleShortcutPersistsAndReregisters() throws {
+        let suiteName = "ActiveApplicationTogglePersistence.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults
+        )
+        hotKeyService.registrations.removeAll()
+
+        model.setActiveApplicationToggleShortcut(
+            keyCode: 17,
+            keyDisplayName: "T",
+            modifiers: [.control, .option]
+        )
+
+        let data = try XCTUnwrap(defaults.data(
+            forKey: "active_application_toggle_shortcut"
+        ))
+        let stored = try JSONDecoder().decode(
+            ActiveApplicationToggleShortcut.self,
+            from: data
+        )
+
+        XCTAssertEqual(stored, model.activeApplicationToggleShortcut)
+        XCTAssertEqual(hotKeyService.registrations.count, 1)
+        XCTAssertEqual(
+            hotKeyService.registrations[0].activeApplicationToggleShortcut,
+            stored
+        )
+
+        let restoredService = CapturingHotKeyService()
+        let restoredModel = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: restoredService,
+            userDefaults: defaults
+        )
+
+        XCTAssertEqual(restoredModel.activeApplicationToggleShortcut, stored)
+    }
+
+    func testClearingActiveApplicationToggleShortcutRemovesStoredValue() {
+        let suiteName = "ActiveApplicationToggleClear.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults
+        )
+
+        model.setActiveApplicationToggleShortcut(
+            keyCode: 17,
+            keyDisplayName: "T",
+            modifiers: [.control]
+        )
+        hotKeyService.registrations.removeAll()
+
+        model.clearActiveApplicationToggleShortcut()
+
+        XCTAssertEqual(model.activeApplicationToggleShortcut, .unset)
+        XCTAssertNil(defaults.data(forKey: "active_application_toggle_shortcut"))
+        XCTAssertEqual(
+            hotKeyService.registrations.last?.activeApplicationToggleShortcut,
+            .unset
+        )
+    }
+
+    func testNonDataActiveApplicationToggleShortcutRestoresUnsetStateAndRemovesStoredValue() {
+        let suiteName = "ActiveApplicationToggleNonData.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set("not shortcut data", forKey: "active_application_toggle_shortcut")
+
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            userDefaults: defaults
+        )
+
+        XCTAssertEqual(model.activeApplicationToggleShortcut, .unset)
+        XCTAssertNil(defaults.object(forKey: "active_application_toggle_shortcut"))
+    }
+
+    func testNonRegisterableActiveApplicationToggleShortcutRestoresUnsetStateAndRemovesStoredValue() throws {
+        let suiteName = "ActiveApplicationToggleNonRegisterable.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let invalidShortcut = ActiveApplicationToggleShortcut(
+            keyCode: 17,
+            keyDisplayName: "T",
+            modifiers: []
+        )
+        defaults.set(
+            try JSONEncoder().encode(invalidShortcut),
+            forKey: "active_application_toggle_shortcut"
+        )
+
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            userDefaults: defaults
+        )
+
+        XCTAssertEqual(model.activeApplicationToggleShortcut, .unset)
+        XCTAssertNil(defaults.object(forKey: "active_application_toggle_shortcut"))
+    }
+
+    func testCorruptActiveApplicationToggleShortcutRestoresUnsetState() {
+        let suiteName = "ActiveApplicationToggleCorrupt.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(
+            Data([0xFF, 0x00]),
+            forKey: "active_application_toggle_shortcut"
+        )
+
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            userDefaults: defaults
+        )
+
+        XCTAssertEqual(model.activeApplicationToggleShortcut, .unset)
+        XCTAssertNil(defaults.data(forKey: "active_application_toggle_shortcut"))
+    }
+
     func testDockFinderManualAndWindowCallbacksRouteToExistingBehaviors() async {
         let dockItem = DockItem(
             name: "Terminal",
@@ -85,6 +256,38 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(launcher.activatedItems, [dockItem, manual.dockItem])
         XCTAssertEqual(launcher.activateFinderCallCount, 1)
         _ = model
+    }
+
+    func testActiveApplicationToggleCallbackUsesExistingToggleMethod() async {
+        let suiteName = "ActiveApplicationToggleCallback.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults,
+            activeApplicationProvider: {
+                ActiveApplication(
+                    name: "Safari",
+                    bundleIdentifier: "com.apple.Safari"
+                )
+            }
+        )
+
+        hotKeyService.onActiveApplicationToggleHotKey?()
+        await Task.yield()
+
+        XCTAssertTrue(model.isActiveApplicationDisabled)
+        XCTAssertEqual(
+            defaults.dictionary(forKey: "disabled_hot_key_applications")
+                as? [String: String],
+            ["com.apple.Safari": "Safari"]
+        )
     }
 
     func testHotKeyCallbacksHopToMainActorWhenInvokedOffMainActor() async {
@@ -213,7 +416,111 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertFalse(model.areHotKeysPaused)
     }
 
-    func testDisabledActiveApplicationUnregistersAndOtherApplicationRestoresHotKeys() async {
+    func testDisabledActiveApplicationKeepsOnlyControlRegistrationAndSecondToggleRestoresAll() {
+        let suiteName = "ActiveApplicationToggleScope.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        storeActiveApplicationToggleShortcut(
+            ActiveApplicationToggleShortcut(
+                keyCode: 17,
+                keyDisplayName: "T",
+                modifiers: [.control, .option]
+            ),
+            in: defaults
+        )
+
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults,
+            activeApplicationProvider: {
+                ActiveApplication(
+                    name: "Safari",
+                    bundleIdentifier: "com.apple.Safari"
+                )
+            }
+        )
+        hotKeyService.registrations.removeAll()
+        hotKeyService.unregisterCallCount = 0
+
+        model.toggleHotKeysForActiveApplication()
+
+        XCTAssertTrue(model.isActiveApplicationDisabled)
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 0)
+        XCTAssertEqual(
+            hotKeyService.registrations.last?.scope,
+            .activeApplicationToggleOnly
+        )
+
+        model.toggleHotKeysForActiveApplication()
+
+        XCTAssertFalse(model.isActiveApplicationDisabled)
+        XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
+    }
+
+    func testGlobalPauseUnregistersControlAndRegularHotKeys() {
+        let suiteName = "ActiveApplicationTogglePause.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        storeActiveApplicationToggleShortcut(
+            ActiveApplicationToggleShortcut(
+                keyCode: 17,
+                keyDisplayName: "T",
+                modifiers: [.control]
+            ),
+            in: defaults
+        )
+
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults
+        )
+        hotKeyService.registrations.removeAll()
+        hotKeyService.unregisterCallCount = 0
+
+        model.pauseHotKeysIndefinitely()
+
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 1)
+        XCTAssertEqual(hotKeyService.registrations, [])
+    }
+
+    func testMissingActiveApplicationDoesNotChangeDisabledStateOrPersistence() async {
+        let suiteName = "ActiveApplicationToggleMissingApp.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults,
+            activeApplicationProvider: { nil }
+        )
+        hotKeyService.registrations.removeAll()
+
+        hotKeyService.onActiveApplicationToggleHotKey?()
+        await Task.yield()
+
+        XCTAssertEqual(model.disabledApplications, [:])
+        XCTAssertNil(defaults.dictionary(forKey: "disabled_hot_key_applications"))
+        XCTAssertEqual(hotKeyService.registrations, [])
+    }
+
+    func testDisabledActiveApplicationUsesControlOnlyRegistrationAndOtherApplicationRestoresAll() async {
         let workspaceNotifications = NotificationCenter()
         var currentApplication = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
         let hotKeyService = CapturingHotKeyService()
@@ -230,7 +537,8 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         hotKeyService.unregisterCallCount = 0
 
         model.toggleHotKeysForActiveApplication()
-        XCTAssertEqual(hotKeyService.unregisterCallCount, 1)
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 0)
+        XCTAssertEqual(hotKeyService.registrations.last?.scope, .activeApplicationToggleOnly)
         XCTAssertTrue(model.isActiveApplicationDisabled)
 
         currentApplication = ActiveApplication(name: "Notes", bundleIdentifier: "com.apple.Notes")
@@ -238,13 +546,13 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         await Task.yield()
 
         XCTAssertEqual(model.activeApplication, currentApplication)
-        XCTAssertEqual(hotKeyService.registrations.count, 1)
+        XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
 
         currentApplication = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
         workspaceNotifications.post(name: NSWorkspace.didActivateApplicationNotification, object: nil)
         await Task.yield()
 
-        XCTAssertEqual(hotKeyService.unregisterCallCount, 2)
+        XCTAssertEqual(hotKeyService.registrations.last?.scope, .activeApplicationToggleOnly)
         XCTAssertTrue(model.isActiveApplicationDisabled)
     }
 
@@ -363,11 +671,19 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
             activeApplicationProvider: activeApplicationProvider,
             workspaceNotificationCenter: workspaceNotificationCenter,
             pauseScheduler: pauseScheduler,
-            hotKeyServiceFactory: { onDockHotKey, onFinderHotKey, onManualHotKey, onWindowHotKey in
+            hotKeyServiceFactory: {
+                onDockHotKey,
+                onFinderHotKey,
+                onManualHotKey,
+                onWindowHotKey,
+                onActiveApplicationToggleHotKey in
+
                 hotKeyService.onDockHotKey = onDockHotKey
                 hotKeyService.onFinderHotKey = onFinderHotKey
                 hotKeyService.onManualHotKey = onManualHotKey
                 hotKeyService.onWindowHotKey = onWindowHotKey
+                hotKeyService.onActiveApplicationToggleHotKey =
+                    onActiveApplicationToggleHotKey
                 return hotKeyService
             }
         )
@@ -412,8 +728,16 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         UserDefaults.standard.set(data, forKey: "manual_shortcuts")
     }
 
+    private func storeActiveApplicationToggleShortcut(
+        _ shortcut: ActiveApplicationToggleShortcut,
+        in defaults: UserDefaults
+    ) {
+        let data = try! JSONEncoder().encode(shortcut)
+        defaults.set(data, forKey: "active_application_toggle_shortcut")
+    }
+
     private func clearZapAppModelDefaults() {
-        for key in ["shortcut_modifiers", "finder_shortcut_enabled", "manual_shortcuts", "start_at_login", "window_shortcuts", "window_management_enabled", "hot_keys_paused_until", "hot_keys_paused_indefinitely", "disabled_hot_key_applications"] {
+        for key in ["shortcut_modifiers", "finder_shortcut_enabled", "manual_shortcuts", "start_at_login", "window_shortcuts", "window_management_enabled", "hot_keys_paused_until", "hot_keys_paused_indefinitely", "disabled_hot_key_applications", "active_application_toggle_shortcut"] {
             UserDefaults.standard.removeObject(forKey: key)
         }
     }
@@ -445,6 +769,8 @@ private final class CapturingHotKeyService: GlobalHotKeyServicing {
         let finderShortcutEnabled: Bool
         let manualShortcuts: [ManualShortcut]
         let windowShortcuts: [WindowShortcut]
+        let activeApplicationToggleShortcut: ActiveApplicationToggleShortcut
+        let scope: GlobalHotKeyRegistrationScope
     }
 
     struct Callbacks: @unchecked Sendable {
@@ -461,6 +787,7 @@ private final class CapturingHotKeyService: GlobalHotKeyServicing {
     var onFinderHotKey: (() -> Void)?
     var onManualHotKey: ((UUID) -> Void)?
     var onWindowHotKey: ((WindowAction) -> Void)?
+    var onActiveApplicationToggleHotKey: (() -> Void)?
 
     var callbacks: Callbacks {
         Callbacks(
@@ -475,13 +802,17 @@ private final class CapturingHotKeyService: GlobalHotKeyServicing {
         modifiers: Set<ShortcutModifier>,
         finderShortcutEnabled: Bool,
         manualShortcuts: [ManualShortcut],
-        windowShortcuts: [WindowShortcut]
+        windowShortcuts: [WindowShortcut],
+        activeApplicationToggleShortcut: ActiveApplicationToggleShortcut,
+        scope: GlobalHotKeyRegistrationScope
     ) -> String? {
         registrations.append(Registration(
             modifiers: modifiers,
             finderShortcutEnabled: finderShortcutEnabled,
             manualShortcuts: manualShortcuts,
-            windowShortcuts: windowShortcuts
+            windowShortcuts: windowShortcuts,
+            activeApplicationToggleShortcut: activeApplicationToggleShortcut,
+            scope: scope
         ))
         return nextRegistrationError
     }

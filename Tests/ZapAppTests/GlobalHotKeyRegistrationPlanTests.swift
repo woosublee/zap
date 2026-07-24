@@ -206,6 +206,149 @@ final class GlobalHotKeyRegistrationPlanTests: XCTestCase {
         XCTAssertEqual(plan.errors.filter { $0.contains("(conflict)") }, ["Some window shortcuts could not be registered: Left Half (conflict)"])
     }
 
+    func testActiveApplicationTogglePlansFirstWithReservedID() {
+        let shortcut = ActiveApplicationToggleShortcut(
+            keyCode: 17,
+            keyDisplayName: "T",
+            modifiers: [.control, .option]
+        )
+
+        let plan = planner.plan(
+            modifiers: [.option],
+            finderShortcutEnabled: true,
+            manualShortcuts: [],
+            windowShortcuts: [],
+            activeApplicationToggleShortcut: shortcut
+        )
+
+        XCTAssertEqual(
+            plan.hotKeys.first,
+            PlannedHotKey(
+                id: 3000,
+                keyCode: 17,
+                modifiers: UInt32(controlKey | optionKey),
+                owner: .activeApplicationToggle
+            )
+        )
+    }
+
+    func testActiveApplicationToggleWinsFinderConflict() {
+        let keyCode = UInt32(kVK_ANSI_Grave)
+        let combo = HotKeyCombo(
+            keyCode: keyCode,
+            modifiers: UInt32(optionKey)
+        )
+
+        let plan = planner.plan(
+            modifiers: [.option],
+            finderShortcutEnabled: true,
+            manualShortcuts: [],
+            windowShortcuts: [],
+            activeApplicationToggleShortcut: ActiveApplicationToggleShortcut(
+                keyCode: keyCode,
+                keyDisplayName: "`",
+                modifiers: [.option]
+            )
+        )
+
+        XCTAssertEqual(
+            plan.hotKeys.filter { $0.combo == combo }.map(\.owner),
+            [.activeApplicationToggle]
+        )
+        XCTAssertTrue(plan.errors.contains(
+            "Finder shortcut could not be registered for all ₩/` variants: ` (conflict)"
+        ))
+    }
+
+    func testActiveApplicationToggleWinsDockManualAndWindowConflict() {
+        let keyCode = NumberKey.one.carbonKeyCode
+        let controlShortcut = ActiveApplicationToggleShortcut(
+            keyCode: keyCode,
+            keyDisplayName: "1",
+            modifiers: [.option]
+        )
+
+        let plan = planner.plan(
+            modifiers: [.option],
+            finderShortcutEnabled: false,
+            manualShortcuts: [
+                manualShortcut(
+                    name: "Terminal",
+                    keyCode: keyCode,
+                    modifiers: [.option]
+                )
+            ],
+            windowShortcuts: [
+                windowShortcut(
+                    .fullscreen,
+                    keyCode: keyCode,
+                    modifiers: [.option]
+                )
+            ],
+            activeApplicationToggleShortcut: controlShortcut
+        )
+
+        let combo = HotKeyCombo(
+            keyCode: keyCode,
+            modifiers: UInt32(optionKey)
+        )
+        XCTAssertEqual(
+            plan.hotKeys.filter { $0.combo == combo }.map(\.owner),
+            [.activeApplicationToggle]
+        )
+        XCTAssertTrue(plan.errors.contains(
+            "Some Dock shortcuts could not be registered: 1 (conflict)"
+        ))
+        XCTAssertTrue(plan.errors.contains(
+            "Some manual shortcuts could not be registered: Terminal (conflict)"
+        ))
+        XCTAssertTrue(plan.errors.contains(
+            "Some window shortcuts could not be registered: Fullscreen (conflict)"
+        ))
+    }
+
+    func testUnsetActiveApplicationToggleIsNotPlanned() {
+        let plan = planner.plan(
+            modifiers: [.option],
+            finderShortcutEnabled: false,
+            manualShortcuts: [],
+            windowShortcuts: [],
+            activeApplicationToggleShortcut: .unset
+        )
+
+        XCTAssertFalse(plan.hotKeys.contains { $0.owner == .activeApplicationToggle })
+    }
+
+    func testActiveApplicationToggleOnlyScopeOmitsAllRegularOwners() {
+        let plan = planner.plan(
+            modifiers: [.option],
+            finderShortcutEnabled: true,
+            manualShortcuts: [
+                manualShortcut(
+                    name: "Terminal",
+                    keyCode: 17,
+                    modifiers: [.control]
+                )
+            ],
+            windowShortcuts: [
+                windowShortcut(
+                    .center,
+                    keyCode: 8,
+                    modifiers: [.command]
+                )
+            ],
+            activeApplicationToggleShortcut: ActiveApplicationToggleShortcut(
+                keyCode: 45,
+                keyDisplayName: "N",
+                modifiers: [.control, .option]
+            ),
+            scope: .activeApplicationToggleOnly
+        )
+
+        XCTAssertEqual(plan.hotKeys.map(\.owner), [.activeApplicationToggle])
+        XCTAssertEqual(plan.errors, [])
+    }
+
     func testCarbonHotKeyRegistrationUsesEventDispatcherTargetLikeSpectacle() throws {
         let packageRootURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
