@@ -17,6 +17,7 @@ struct SettingsView: View {
     @Binding var showMenuBarIcon: Bool
     @ObservedObject private var navigationState: SettingsNavigationState
     @State private var recordingShortcut: ManualShortcut?
+    @State private var isRecordingActiveApplicationToggleShortcut = false
 
     init(
         model: ZapAppModel,
@@ -82,6 +83,24 @@ struct SettingsView: View {
                 },
                 onCancel: {
                     recordingShortcut = nil
+                }
+            )
+        }
+        .sheet(
+            isPresented:
+                $isRecordingActiveApplicationToggleShortcut
+        ) {
+            ShortcutRecorderView(
+                activeApplicationToggleOnRecord: { recordedShortcut in
+                    model.setActiveApplicationToggleShortcut(
+                        keyCode: recordedShortcut.keyCode,
+                        keyDisplayName: recordedShortcut.keyDisplayName,
+                        modifiers: recordedShortcut.modifiers
+                    )
+                    isRecordingActiveApplicationToggleShortcut = false
+                },
+                onCancel: {
+                    isRecordingActiveApplicationToggleShortcut = false
                 }
             )
         }
@@ -160,6 +179,7 @@ struct SettingsView: View {
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: ZapSpacing.large) {
             permissionsSection
+            shortcutControlsSection
             behaviorSection
             updatesSection
         }
@@ -200,6 +220,49 @@ struct SettingsView: View {
                     }
                 }
             )
+        }
+    }
+
+    private var shortcutControlsSection: some View {
+        SettingsCard(title: "Shortcut Controls") {
+            SettingsRow(
+                title: "Toggle Zap for Current App",
+                subtitle:
+                    "Disable or re-enable Zap shortcuts for the currently active app.",
+                leading: {
+                    Image(systemName: "app.badge.checkmark")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 24)
+                },
+                trailing: {
+                    HStack(spacing: ZapSpacing.medium) {
+                        Button {
+                            isRecordingActiveApplicationToggleShortcut = true
+                        } label: {
+                            ShortcutKeycapGroupView(shortcut: model.activeApplicationToggleShortcut.shortcutTitle)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            "Record Toggle Zap for Current App shortcut"
+                        )
+                        .help("Record shortcut")
+
+                        if model.activeApplicationToggleShortcut.canRegister {
+                            Button("Clear", role: .destructive) {
+                                model.clearActiveApplicationToggleShortcut()
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            )
+
+            if let registrationError = model.registrationError {
+                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 

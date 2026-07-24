@@ -31,6 +31,19 @@ struct ShortcutRecorderView: View {
         self.onCancel = onCancel
     }
 
+    init(
+        activeApplicationToggleOnRecord onRecord:
+            @escaping (RecordedShortcut) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.title = "Record Shortcut Control"
+        self.instructions =
+            "Press the global shortcut that disables or re-enables Zap for the currently active app."
+        self.capturePrompt = "Press toggle shortcut"
+        self.onRecord = onRecord
+        self.onCancel = onCancel
+    }
+
     @State private var errorMessage: String?
     @State private var recordingPulse = false
 
