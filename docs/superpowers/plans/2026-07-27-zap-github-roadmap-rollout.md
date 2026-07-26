@@ -684,9 +684,9 @@ The body must include:
 2. non-goals;
 3. milestone order;
 4. all seven exact exit gates;
-5. milestone sections with `- [ ] R-XX — #number — title` checklist entries;
+5. milestone sections with `- [ ] **R-XX** — #number — \`title\`` checklist entries. `#number`는 Markdown URL로 감싸지 않은 GitHub 직접 mention이어야 한다;
 6. current active milestone `Roadmap & Engineering Baseline`;
-7. current ready Issues R-01 and R-02;
+7. current ready Issues R-01과 R-02도 `**R-XX** — #number — \`title\`` 형식의 직접 mention으로 표시한다;
 8. note that due dates are intentionally omitted;
 9. link to the committed design spec path in the repository.
 
@@ -697,7 +697,9 @@ Assert:
 - marker occurs once;
 - exactly 38 unique R-ID checklist items exist;
 - exactly seven `Exit Gate` headings exist;
-- every checklist URL matches `issue-map.json`;
+- every checklist의 raw `#number` mention이 `issue-map.json`의 실제 Issue number와 일치한다;
+- checklist와 ready Issue 목록에서 `#number`를 Markdown URL 링크로 감싸지 않는다;
+- 모든 direct mention 옆에 R-ID와 canonical Issue title이 함께 있어 작업을 즉시 식별할 수 있다;
 - no placeholder or missing Issue number exists.
 
 - [ ] **Step 3: Upsert the tracking Issue**
