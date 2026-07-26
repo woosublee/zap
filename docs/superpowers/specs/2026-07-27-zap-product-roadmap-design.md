@@ -6,14 +6,14 @@ Zap v0.1.6은 Dock 순번 및 사용자 지정 글로벌 단축키로 앱을 실
 
 현재 제품은 앱 실행, Finder 전환, 수동 앱 단축키, 18개 Window Management 동작, 단축키 일시중지, 앱별 단축키 제외, Sparkle 자동 업데이트까지 제공한다. 핵심 기능은 충분히 유용하지만 일반 소비자 대상 공개 출시에 필요한 설치 신뢰, 첫 실행 안내, 기존 기능 정확성, 오류 복구, 상시 CI와 지원 문서가 부족하다.
 
-공개 최신 릴리스는 v0.1.6이며 현재 `main`과 일치한다. GitHub Issues, milestones, 공개 Project는 아직 없고, 지금까지의 제품 방향과 작업 이력은 PR, release note, `docs/superpowers/specs`, `docs/superpowers/plans`에 분산되어 있다.
+공개 최신 릴리스는 v0.1.6이며 현재 `main`과 일치한다. GitHub Issues와 milestones는 아직 없고, 지금까지의 제품 방향과 작업 이력은 PR, release note, `docs/superpowers/specs`, `docs/superpowers/plans`에 분산되어 있다.
 
 이 문서는 현재 제품 상태와 경쟁 제품의 검증된 패턴을 바탕으로, 소비자에게 전달되는 품질을 최우선으로 하면서 Zap이 장기적으로 확장할 기능을 순차 GitHub Issue와 milestone으로 정의한다.
 
 ## 확정된 제품 결정
 
 1. 첫 도착점은 제한적 베타가 아니라 **소비자 공개 출시**다.
-2. 첫 공개 버전은 **Apple Silicon 전용**으로 지원 범위를 명확히 한다.
+2. 첫 소비자 GA 버전은 **v0.2.0**이며, **Apple Silicon 전용**으로 지원 범위를 명확히 한다.
 3. 주 배포 채널은 **Developer ID로 서명·공증한 DMG 직접 배포**다.
 4. 로드맵은 **품질 게이트 우선** 방식으로 운영한다.
 5. 승인된 로드맵은 실제 GitHub Issues와 milestones로 반영한다.
@@ -96,11 +96,11 @@ Zap v0.1.6은 Dock 순번 및 사용자 지정 글로벌 단축키로 앱을 실
 | 5 | v0.4.0 — Named Workspaces | 여러 앱과 창 배치를 명시적으로 저장·수동 복원 |
 | 6 | v0.5.0 — Context Restoration | 디스플레이 변화와 wake에 선택적으로 workspace 자동 복원 |
 
-v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니라 선행 milestone의 exit gate를 통과했을 때 시작한다.
+v0.2.0을 첫 소비자 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니라 선행 milestone의 exit gate를 통과하고, 모든 release blocker가 종료되며, 현재 milestone의 각 Issue가 완료되거나 이동 사유와 새 milestone을 명시한 뒤 시작한다.
 
 ## GitHub Issue 인벤토리
 
-아래 R-ID는 Issue 생성 순서와 dependency 작성에 사용하는 임시 식별자다. 실제 GitHub Issue 번호가 발급되면 본문과 tracking issue에서 실제 `#번호` 링크로 치환한다.
+아래 R-ID는 Issue 생성 순서와 dependency 작성에 사용하는 안정적인 식별자다. 이 인벤토리는 roadmap design 수준의 요약이며 최종 GitHub Issue body 자체가 아니다. 실제 생성 전에는 모든 항목을 공통 Issue Body Template으로 확장하고, 해당 사항이 없는 필드도 `None`으로 명시하며, 현재 코드 permalink·관련 PR review·release/spec 중 하나 이상의 Evidence를 추가한다. 표시 문구의 R-ID는 실제 `#번호` 링크와 함께 쓰되, 재실행과 중복 방지를 위해 각 Issue에 `<!-- roadmap-id:R-01 -->` 형식의 marker를 영구 유지한다.
 
 ### Milestone 0 — Roadmap & Engineering Baseline
 
@@ -116,7 +116,7 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - bug report에 Zap/macOS version, Accessibility 상태, shortcut, display 구성을 수집하는 항목
 - Acceptance criteria:
   - 새 bug와 feature request가 사용자 문제, 완료 조건, 기존 기능과의 차이를 포함한다.
-  - 한 Issue에 type 1개, priority 1개, area 1~2개, workflow status 1개를 적용한다.
+  - 한 Issue에 type 1개, priority 1개, area 1~2개, status 1개를 적용하고 flag는 별도로 관리한다.
   - release blocker의 정의와 해제 조건을 문서화한다.
 - Non-goals: 초기 GitHub Project 도입
 
@@ -136,19 +136,21 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - force push와 branch deletion을 제한한다.
   - 수동 release workflow도 같은 검증 기준을 재사용한다.
 
-#### R-03 — `test: replace source-text assertions with behavioral smoke coverage`
+#### R-03 — `test: establish behavioral smoke coverage for reliability blockers`
 
-- Priority: P1
+- Priority: P0
 - Area: tests-ci, settings-ui
-- User value: 메뉴, recorder, 권한, 상태 표시가 실제로 동작하는지 회귀 전에 확인한다.
+- User value: 창 history, shortcut recorder, 권한 변화의 실제 사용자 동작을 검증해 P0 정확성 수정을 안전하게 진행한다.
 - Scope:
-  - Settings, menu bar, shortcut recorder, permission refresh의 behavioral test harness
-  - 취약한 `source.contains(...)` assertions의 단계적 제거
-  - 실제 UI 또는 시스템 통합이 불가능한 항목의 명시적 release checklist
+  - R-06, R-07, R-08에 필요한 최소 behavioral test harness
+  - window-history integration, shortcut recorder, Accessibility permission refresh smoke coverage
+  - 실제 macOS 통합 자동화가 불가능한 항목의 명시적 release checklist
 - Acceptance criteria:
   - 테스트가 구현 문자열이 아니라 사용자 동작과 observable state를 검증한다.
+  - 같은 앱의 두 창 history와 AX 적용 실패를 재현할 수 있다.
   - recorder가 기존 global hotkey를 실행하지 않는 흐름을 검증할 수 있다.
-  - Accessibility와 login item의 최소 smoke scenario를 정의한다.
+  - Accessibility grant/revoke에 따른 registration 변화를 검증할 수 있다.
+- Non-goals: 저장소 전체의 `source.contains(...)` assertion 제거. 나머지 교체는 baseline 이후 별도 `tech-debt` Issue로 추적한다.
 - Dependencies: R-02
 
 #### R-04 — `build: make version metadata single-source and enforce monotonic releases`
@@ -165,6 +167,13 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - version 또는 build number가 같거나 낮으면 release가 실패한다.
   - release metadata에 source commit, version, build, architecture를 기록한다.
 - Dependencies: R-02
+
+### Milestone 0 Exit Gate
+
+- Issue form, PR template, labels, milestones 및 release-blocker 운영 규칙이 적용되어 있다.
+- PR과 main push CI가 테스트, shell regression test, Debug/Release bundle verification을 실행한다.
+- main merge는 필수 CI 실패 시 차단된다.
+- R-06~R-08을 검증할 behavioral smoke baseline과 version metadata 검증이 통과한다.
 
 ### v0.1.7 — Reliability Foundation
 
@@ -249,20 +258,20 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - refresh 실패 시 마지막 정상 snapshot을 유지한다.
   - hotkey path에서 Dock plist 및 모든 Bundle을 동기적으로 다시 읽지 않는다.
 
-#### R-11 — `feat: add privacy-safe diagnostics and actionable error recovery`
+#### R-11 — `feat: add privacy-safe diagnostics and support reporting`
 
 - Priority: P1
-- Area: settings-ui, hotkeys, accessibility
-- User value: Zap이 동작하지 않을 때 이유와 해결 방법을 바로 확인할 수 있다.
+- Area: settings-ui, hotkeys
+- User value: Zap이 동작하지 않을 때 실패 종류를 이해하고 지원 요청에 필요한 환경 정보를 안전하게 전달한다.
 - Scope:
   - OSLog categories: lifecycle, hotkey, Dock, AX, login item, update
-  - registration, permission, unsupported window, app resolution 오류의 사용자 메시지
+  - registration, permission, unsupported window, app resolution 오류의 사용자 친화적 분류
   - support report 복사
 - Acceptance criteria:
   - raw enum과 raw OSStatus를 사용자에게 직접 노출하지 않는다.
   - app name, bundle ID, URL 등은 기본 로그에서 private 처리한다.
-  - Settings와 필요한 경우 menu bar에서 복구 action을 제공한다.
-  - version, build, macOS, architecture를 민감정보 없이 복사할 수 있다.
+  - version, build, macOS, architecture와 최근 오류 분류를 민감정보 없이 복사할 수 있다.
+  - 구체적인 복구 action은 R-08, R-09, R-23, R-26 등 해당 기능 Issue가 소유한다.
 
 #### R-12 — `fix: version settings persistence and recover partial corruption`
 
@@ -294,9 +303,10 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - 알려진 경로에서 다른 창에 Undo가 적용되지 않는다.
 - 사용할 수 없는 Window Management hotkey를 등록하지 않는다.
 - shortcut recorder가 기존 Zap action을 실행하지 않는다.
-- Login at Login UI와 실제 시스템 상태가 일치한다.
+- Launch at Login UI와 실제 시스템 상태가 일치한다.
 - window geometry가 odd-sized visible frame을 정확히 채운다.
-- 핵심 오류는 silent no-op이나 raw error가 아니라 복구 가능한 메시지로 보인다.
+- 설정 일부가 손상되어도 정상 shortcut과 설정은 유지된다.
+- 핵심 오류는 silent no-op이나 raw error가 아니라 분류된 사용자 메시지와 support report에 남는다.
 
 ### v0.2.0 — Trusted Public Release
 
@@ -324,7 +334,11 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - `notarytool submit --wait`, `stapler validate`, `spctl --assess`가 통과한다.
   - notarization 실패 시 release를 공개하지 않는다.
   - 깨끗한 macOS user account에서 `Open Anyway` 없이 실행한다.
-- Dependencies: Apple Developer Program credentials, R-14
+- Dependencies: R-14
+- External prerequisites:
+  - active Apple Developer Program membership
+  - Developer ID Application certificate
+  - notarization에 필요한 App Store Connect credential
 
 #### R-16 — `release: make publication main-only, atomic, and update-safe`
 
@@ -354,7 +368,8 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - checksum mismatch는 signing secret을 사용하기 전에 실패한다.
   - runner와 Xcode/Swift version 정책을 명시한다.
   - release asset SHA-256와 artifact provenance를 게시한다.
-  - 가능한 경우 release asset immutability와 signed annotated tag를 적용한다.
+  - GitHub release asset immutability를 활성화한다.
+  - release tag는 검증 가능한 signed annotated tag로 생성한다.
 - Dependencies: R-02
 
 #### R-18 — `feat: add a first-run activation checklist`
@@ -372,7 +387,7 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - 최초 실행에만 Getting Started 화면을 연다.
   - Skip과 Complete를 제공하고 General에서 다시 열 수 있다.
   - 완료 여부는 local-only로 저장한다.
-  - 첫 앱 전환 성공까지 3분 이내를 목표로 수동 smoke test한다.
+  - 깨끗한 macOS 계정에서 Zap 최초 실행을 시작점, mapped app이 frontmost가 된 시점을 종료점으로 측정해 180초 이내에 통과한다.
 - Dependencies: R-08
 
 #### R-19 — `ux: ship a consumer-ready install and complete uninstall flow`
@@ -457,7 +472,9 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - Acceptance criteria:
   - pause 상태에서도 동작 가능한 dedicated control hotkey를 제공한다.
   - 다른 shortcut과의 충돌을 R-07 방식으로 설명한다.
-  - timed pause, indefinite pause, resume 간 우선순위를 정의한다.
+  - unpaused 상태에서 control hotkey를 누르면 indefinite pause로 전환한다.
+  - timed 또는 indefinite pause 상태에서 control hotkey를 누르면 모든 pause를 해제한다.
+  - menu에서 새 timed pause를 선택하면 기존 timed 또는 indefinite pause를 대체한다.
 - Dependencies: R-07
 
 #### R-25 — `feat: add a persistent enable switch for Automatic Dock shortcuts`
@@ -498,11 +515,12 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - Area: accessibility, settings-ui
 - User value: 큰 글꼴, VoiceOver, Full Keyboard Access, motion sensitivity 환경에서도 설정을 완료한다.
 - Acceptance criteria:
-  - Settings가 resizable이며 합리적인 minimum size를 가진다.
+  - Settings 기본 크기는 820×640을 유지하고 minimum size는 720×560으로 설정한다.
+  - 720×560과 macOS 최대 accessibility text size에서 sidebar, permission card, shortcut rows, recorder의 내용이 잘리지 않는다.
   - shortcut capture view에 role, label, value, hint를 제공한다.
   - modifier selection을 의미 있는 문장으로 읽는다.
-  - Reduce Motion에서 반복 pulse를 제거한다.
-  - VoiceOver와 Full Keyboard Access smoke checklist를 자동화 가능한 범위까지 테스트한다.
+  - Reduce Motion이 켜지면 recorder의 반복 pulse를 제거한다.
+  - VoiceOver와 Full Keyboard Access로 sidebar 이동, permission action, shortcut recorder 열기·취소·저장을 완료하는 smoke test를 수행한다.
 
 #### R-29 — `i18n: add localization-ready strings and keyboard-layout-aware key labels`
 
@@ -513,7 +531,8 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - String Catalog 또는 equivalent resource pipeline을 추가한다.
   - 동적 문장을 localization 가능한 단위로 구성한다.
   - 현재 keyboard layout을 사용해 key label을 표시한다.
-  - English, Korean, Japanese/JIS, French/AZERTY 등 대표 layout을 검증한다.
+  - US ANSI, Korean 2-set, Japanese JIS, French AZERTY layout을 검증한다.
+- Non-goals: v0.2.x에서 영어 이외의 전체 UI 번역을 출시하는 것
 - Dependencies: R-28
 
 #### R-30 — `chore: replace the legacy SNAP Carbon hotkey signature`
@@ -544,12 +563,12 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - 첫 버전은 `Activate only`와 `Hide app`을 지원한다.
   - 기존 설치 기본값은 `Activate only`다.
   - Automatic Dock과 Manual shortcut에 같은 정책을 적용한다.
-  - Finder의 기존 reopen behavior는 유지한다.
+  - Finder는 repeated-action 정책에서 제외하고 기존 reopen behavior를 항상 사용한다.
 
 #### R-32 — `feat: cycle same-app windows on repeated app shortcuts`
 
 - Priority: P1
-- Area: app-launching, window-management, accessibility
+- Area: app-launching, accessibility
 - User value: 브라우저, 터미널, Finder 등 같은 앱의 여러 창을 별도 단축키 없이 순환한다.
 - Acceptance criteria:
   - repeated action option에 `Cycle Windows`를 추가한다.
@@ -558,7 +577,7 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - 첫 버전은 current Space의 window부터 지원한다.
   - Accessibility가 없거나 조회가 실패하면 기존 activate 동작으로 fallback한다.
   - Screen Recording 권한을 요구하지 않는다.
-- Dependencies: R-06
+- Dependencies: R-06, R-31
 
 #### R-33 — `feat: export and import a versioned Zap configuration`
 
@@ -569,7 +588,9 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
   - schema version이 있는 JSON으로 export한다.
   - runtime pause expiration 같은 일시 상태는 제외한다.
   - import 전에 변경 항목과 누락 앱을 preview한다.
-  - Merge와 Replace를 구분한다.
+  - Manual shortcut은 bundle identifier, Window shortcut은 action identifier, singleton preference는 setting key를 merge identity로 사용한다.
+  - Merge는 기존 값을 유지하고 없는 항목만 추가하며, 충돌 항목은 preview에서 건너뛴 것으로 표시한다.
+  - Replace는 preview 승인 후 export 대상 설정 전체를 원자적으로 교체한다.
   - 지원하지 않는 future schema는 기존 설정을 변경하지 않고 거부한다.
   - 실패 시 부분 적용하지 않는다.
   - network와 account를 사용하지 않는다.
@@ -590,9 +611,12 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - User value: 여러 앱과 여러 창을 안전하게 workspace에 포함할 기반을 만든다.
 - Acceptance criteria:
   - 일반 user window를 열거하고 stable session identity를 부여한다.
+  - matching descriptor는 app bundle identifier, AX role/subrole, optional application-provided AXIdentifier, session window identity로 구성한다.
+  - restore matching은 exact session identity → stable AXIdentifier → 해당 앱의 단일 eligible candidate 순서로 시도한다.
+  - 후보가 둘 이상이고 stable match가 없으면 추측하지 않고 `ambiguous match`로 보고한다.
   - sheet, system dialog, 비표준 window를 명확한 정책으로 제외한다.
   - display와 normalized frame을 계산한다.
-  - window title은 기본 identity나 persistence에 사용하지 않는다.
+  - window title은 identity나 persistence에 사용하지 않는다.
 - Dependencies: R-06
 
 #### R-35 — `feat: save named workspace presets locally`
@@ -601,8 +625,9 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - Area: window-management, settings-ui
 - User value: Coding, Writing, Meeting 등 반복하는 앱·창 배치를 명시적으로 저장한다.
 - Acceptance criteria:
-  - preset name, app bundle identifier, display information, normalized frame을 저장한다.
-  - window title은 기본적으로 저장하지 않는다.
+  - preset name, window matching descriptor, display information, normalized frame을 저장한다.
+  - window title은 저장하지 않는다.
+  - stable AXIdentifier가 없는 multi-window app은 restore 시 ambiguous가 될 수 있음을 Save preview에서 알린다.
   - preset schema version을 둔다.
   - duplicate name, missing app, unsupported window를 설명한다.
   - 모든 data는 local-only다.
@@ -614,8 +639,10 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - Area: window-management, accessibility
 - User value: 여러 앱과 창을 한 번의 action으로 복원하고 실패한 항목만 이해한다.
 - Acceptance criteria:
-  - 존재하는 app/window는 가능한 범위에서 복원한다.
-  - 누락, 이동 거부, display mismatch를 결과로 보고한다.
+  - exact 또는 unambiguous match가 확인된 app/window만 복원한다.
+  - 누락, ambiguous match, 이동 거부, display mismatch를 항목별 결과로 보고한다.
+  - 성공적으로 이동한 창만 하나의 global undo transaction에 commit한다.
+  - 실패하거나 모호한 창은 기존 위치와 history를 변경하지 않는다.
   - restore 전체를 한 번에 Undo할 수 있다.
   - Settings와 configurable global shortcut에서 수동 실행한다.
   - display change와 wake 자동 trigger는 포함하지 않는다.
@@ -648,8 +675,9 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - User value: 외부 모니터 연결·해제와 wake 이후 무너진 창 배치를 자동으로 복구한다.
 - Acceptance criteria:
   - preset별 explicit opt-in이 필요하다.
-  - display change를 debounce한다.
-  - restore나 user window movement 중에는 중복 실행하지 않는다.
+  - display change 후 2초 동안 debounce한다.
+  - debounce 기간에 user-originated AX move/resize event가 관찰되면 이번 auto-restore를 취소한다.
+  - restore가 진행 중이면 새 trigger를 queue하지 않고 현재 실행 종료 후 최신 display state만 한 번 재평가한다.
   - wake/unlock 적용은 별도 option이다.
   - 자동 app launch는 기본 Off다.
   - 결과를 알리고 전체 작업을 한 번에 Undo할 수 있다.
@@ -674,7 +702,7 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 - 현재 active milestone과 다음 `status:ready` Issue
 - 제품 결정 변경 기록
 
-실제 Issue 번호가 발급된 뒤 R-ID 목록을 `#번호` 링크로 치환한다.
+실제 Issue 번호가 발급된 뒤 tracking issue의 표시 목록은 `R-01 — #번호` 형식으로 갱신하고, 각 Issue body의 숨은 roadmap marker는 유지한다.
 
 ### Milestones
 
@@ -688,7 +716,11 @@ v0.2.0을 첫 GA 기준점으로 삼는다. 이후 milestone은 날짜가 아니
 
 ### Labels
 
-기존 `bug`, `documentation`, `enhancement`를 type label로 유지한다.
+Type은 기존 label을 다음 규칙으로 사용한다.
+
+- 사용자에게 잘못된 동작을 수정하는 Issue → `bug`
+- 문서만 변경하는 Issue → `documentation`
+- 나머지 roadmap 작업 → `enhancement`
 
 Priority:
 
@@ -709,50 +741,62 @@ Area:
 - `area:localization`
 - `area:documentation`
 
-Workflow:
+Status는 한 Issue에 하나만 적용한다.
 
+- `status:planned`
 - `status:needs-design`
 - `status:blocked`
 - `status:ready`
+- `status:in-progress`
+
+Flags는 status와 별도로 필요한 만큼 적용한다.
+
 - `release-blocker`
 - `tech-debt`
 - `roadmap`
 
+초기 상태는 active milestone에서 즉시 실행 가능한 Issue를 `status:ready`, 실제 dependency가 미완료인 Issue를 `status:blocked`, 미래 milestone의 범위가 확정된 Issue를 `status:planned`, 추가 제품 설계가 필요한 Issue를 `status:needs-design`으로 배정한다.
+
 ### Issue Body Template
 
-모든 roadmap Issue는 다음 순서를 사용한다.
+모든 roadmap Issue는 생성 전에 아래 순서로 완성한다. 해당 사항이 없는 필드는 생략하지 않고 `None`이라고 적는다.
 
-1. User problem
-2. Product value
-3. Scope
-4. Acceptance criteria
-5. Dependencies
-6. Non-goals
-7. Evidence
+1. 숨은 `roadmap-id` marker
+2. User problem
+3. Product value
+4. Scope
+5. Acceptance criteria
+6. Dependencies
+7. External prerequisites
+8. Non-goals
+9. Evidence
    - current code permalink 또는 `file:line`
    - 관련 PR review
    - 관련 release/spec
-8. Milestone exit-gate impact
+10. Milestone exit-gate impact 또는 `Non-gating`
 
 ### 실행 규칙
 
 - 기본적으로 다음 Issue 하나만 `status:ready`로 둔다.
 - 서로 독립적인 문서·릴리스·UI 작업만 병렬로 ready 상태를 허용한다.
-- dependency가 완료되면 `status:blocked`를 제거한다.
+- dependency가 완료되면 `status:blocked`를 `status:ready` 또는 `status:planned`로 전환한다.
+- 작업을 시작하면 `status:in-progress`로 전환한다.
 - P0는 해당 milestone의 release 전에 반드시 완료한다.
+- 다음 milestone은 exit gate 통과, 모든 release blocker 종료, 현재 milestone의 각 Issue 완료 또는 이동 사유·새 milestone 기록이 모두 충족된 뒤 시작한다.
 - 구현 중 발견한 소비자 신뢰성 문제는 다음 milestone으로 미루지 않고 현재 milestone의 release blocker 여부를 판단한다.
 - milestone 완료 시 단위 테스트만이 아니라 실제 install, permission, hotkey, update, window flow로 exit gate를 검증한다.
 
 ## 실제 GitHub 반영 순서
 
 1. 이 설계 문서를 review하고 확정한다.
-2. labels를 생성한다.
-3. milestones를 생성한다.
-4. R-01부터 R-38까지 Issues를 생성한다.
-5. 발급된 Issue 번호로 dependencies와 checklist를 갱신한다.
-6. `Zap Product Roadmap` tracking issue를 생성한다.
-7. Issue 수, milestone 배정, labels, dependency link, exit gate 누락을 검증한다.
-8. R-01과 R-02를 첫 `status:ready` Issue로 지정한다.
+2. 기존 labels, milestones, open/closed Issues와 tracking issue를 preflight한다.
+3. labels와 milestones는 exact name 기준으로 없을 때만 생성하고, 이미 있으면 재사용한다.
+4. R-01부터 R-38까지 공통 Issue Body Template을 완성하고 `roadmap-id` marker를 부여한다.
+5. open/closed Issue에서 같은 marker를 검색하고 존재하지 않는 R-ID만 생성한다.
+6. R-ID→Issue 번호 mapping으로 dependencies, milestone exit-gate impact와 checklist를 갱신한다.
+7. `Zap Product Roadmap` tracking issue를 exact title과 marker 기준으로 생성하거나 갱신한다.
+8. Issue 수, 중복 marker, milestone 배정, labels, dependency link, exit gate 누락을 검증한다.
+9. R-01과 R-02를 첫 `status:ready` Issue로 지정하고 나머지는 dependency와 milestone에 따라 `status:blocked` 또는 `status:planned`로 지정한다.
 
 ## 검증 기준
 
@@ -760,8 +804,8 @@ Workflow:
 
 - 7개 milestone이 정확한 이름으로 존재한다.
 - 38개 roadmap Issue가 중복 없이 존재한다.
-- 모든 Issue에 type, priority, area, workflow label과 milestone이 배정된다.
-- 모든 dependency가 실제 Issue 링크로 연결된다.
+- 모든 Issue에 type, priority, area, status label과 milestone이 배정되고 필요한 flag가 별도로 적용된다.
+- 모든 R-ID dependency가 실제 Issue 링크로 연결되고 external prerequisite와 구분된다.
 - tracking issue에 38개 Issue와 7개 exit gate가 포함된다.
 - P0 Issue가 명확히 표시된다.
 - 이미 구현된 Window Management, Sparkle, Pause, per-app disable, active-app toggle을 신규 기능 Issue로 중복 생성하지 않는다.
