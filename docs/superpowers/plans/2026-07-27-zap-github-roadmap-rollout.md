@@ -178,7 +178,7 @@ https://github.com/woosublee/zap/blob/59498cdcb46fe1b42ea25967ee7986c2618b41a1/
 | ID | Canonical User problem | Required evidence |
 |---|---|---|
 | R-01 | 제품 backlog와 release 조건이 PR, spec, release note에 흩어져 앞으로 할 일과 완료된 일을 구분하기 어렵다. | GitHub Issues와 milestones가 비어 있는 현재 repository 링크, PR #1~#8 |
-| R-02 | PR과 main push에서 자동 검증하지 않아 release를 시작한 뒤에야 빌드·테스트 실패를 발견할 수 있다. | `.github/workflows/release.yml:8-23`, `Tests/ScriptTests/generate-sparkle-appcast-tests.sh:1-139` |
+| R-02 | PR과 main push에서 자동 검증하지 않아 release를 시작한 뒤에야 빌드·테스트 실패를 발견할 수 있다. | `.github/workflows/release.yml:8-23`, `Tests/ScriptTests/generate-sparkle-appcast-tests.sh:1-138` |
 | R-03 | 핵심 UI·권한·history 테스트가 실제 동작 대신 source 문자열에 결합되어 P0 reliability 수정을 충분히 보호하지 못한다. | `Tests/ZapAppTests/ShortcutRecorderViewTests.swift:11-92`, `Tests/ZapAppTests/SettingsWindowManagementUITests.swift:22-355` |
 | R-04 | version과 build metadata가 여러 파일에 분산되고 이전 release보다 증가했는지 검증하지 않아 Sparkle update가 누락될 수 있다. | `Makefile:4-6`, `Info.plist:13-16`, `.github/workflows/release.yml:35-61` |
 | R-05 | 홀수 크기 display에서 half/corner layout이 1px gap을 만들거나 clamp 후 frame이 visible bounds 밖에 남을 수 있다. | `Sources/ZapCore/WindowPositionCalculator.swift:93-164`, `Sources/ZapCore/WindowPositionCalculator.swift:226-253`, PR #5 review threads |
@@ -190,12 +190,12 @@ https://github.com/woosublee/zap/blob/59498cdcb46fe1b42ea25967ee7986c2618b41a1/
 | R-11 | 실패가 beep, raw enum, OSStatus 또는 silent no-op으로 끝나 사용자가 지원 요청에 필요한 원인을 알 수 없다. | `Sources/ZapApp/Services/GlobalHotKeyService.swift:386-405`, `Sources/ZapApp/ViewModels/WindowManagementModel.swift:64-73` |
 | R-12 | 일부 설정 JSON이 손상되면 정상 항목까지 빈 목록이나 default로 조용히 돌아갈 수 있다. | `Sources/ZapApp/ViewModels/ZapAppModel.swift:509-561`, `Sources/ZapApp/ViewModels/WindowManagementModel.swift:155-166` |
 | R-13 | sleep, wake, system clock 변경 후 pause timer와 실제 registration 상태가 어긋날 수 있다. | `Sources/ZapApp/ViewModels/ZapAppModel.swift:188-263`, `Sources/ZapApp/ViewModels/ZapAppModel.swift:419-432` |
-| R-14 | 공식 artifact가 사실상 arm64지만 다운로드·appcast에서 지원 architecture와 minimum OS를 명확히 알 수 없다. | `.github/workflows/release.yml:21-23`, `scripts/generate-sparkle-appcast.sh:108-130`, `README.md:195-203` |
+| R-14 | 공식 artifact가 사실상 arm64지만 다운로드·appcast에서 지원 architecture와 minimum OS를 명확히 알 수 없다. | `.github/workflows/release.yml:21-23`, `scripts/generate-sparkle-appcast.sh:108-130`, `README.md:195-202` |
 | R-15 | self-signed, non-notarized DMG가 Gatekeeper 우회를 요구해 Accessibility 앱에 필요한 소비자 신뢰를 훼손한다. | `.github/workflows/release.yml:1-6`, `Makefile:102-129`, `README.md:169-176` |
 | R-16 | feature branch release, concurrent release, partial asset upload가 latest Sparkle feed를 오염시킬 수 있다. | `.github/workflows/release.yml:8-17`, `.github/workflows/release.yml:128-176` |
 | R-17 | Sparkle release tool archive를 checksum 검증 없이 실행하고 release artifact provenance를 게시하지 않는다. | `Makefile:177-190`, `scripts/generate-sparkle-appcast.sh:57-75` |
 | R-18 | 메뉴바 앱을 처음 실행해도 onboarding 없이 hotkey가 등록되어 사용자는 mapping, 권한, 첫 성공 경로를 알기 어렵다. | `Sources/ZapApp/ZapApp.swift:11-32`, `Sources/ZapApp/ViewModels/ZapAppModel.swift:205-214` |
-| R-19 | 소비자용 download/install/uninstall flow와 Applications drag target이 없어 DMG에서 직접 실행하거나 잔여 설정을 남길 수 있다. | `Makefile:212-247`, `Makefile:267-283`, `README.md:125-203` |
+| R-19 | 소비자용 download/install/uninstall flow와 Applications drag target이 없어 DMG에서 직접 실행하거나 잔여 설정을 남길 수 있다. | `Makefile:212-247`, `Makefile:267-283`, `README.md:125-202` |
 | R-20 | Accessibility·global hotkey 권한을 요청하지만 privacy, support, security, license, third-party notice가 독립 문서로 존재하지 않는다. | `README.md:117-123`, `Sources/ZapApp/Views/AboutView.swift:19-31` |
 | R-21 | release note와 README가 v0.1.6의 Pause, per-app disable, active-app toggle과 compatibility를 충분히 설명하지 않는다. | `README.md:16-20`, `README.md:76-115`, release v0.1.6 |
 | R-22 | pause와 app-disabled 상태가 재실행 후에도 유지되지만 남은 시간과 현재 상태가 icon/menu에서 충분히 보이지 않는다. | `Sources/ZapApp/Views/MenuBarView.swift:37-74`, `Sources/ZapApp/ZapApp.swift:53-64` |

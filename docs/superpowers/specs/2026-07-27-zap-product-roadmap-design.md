@@ -6,7 +6,7 @@ Zap v0.1.6은 Dock 순번 및 사용자 지정 글로벌 단축키로 앱을 실
 
 현재 제품은 앱 실행, Finder 전환, 수동 앱 단축키, 18개 Window Management 동작, 단축키 일시중지, 앱별 단축키 제외, Sparkle 자동 업데이트까지 제공한다. 핵심 기능은 충분히 유용하지만 일반 소비자 대상 공개 출시에 필요한 설치 신뢰, 첫 실행 안내, 기존 기능 정확성, 오류 복구, 상시 CI와 지원 문서가 부족하다.
 
-공개 최신 릴리스는 v0.1.6이며 현재 `main`과 일치한다. GitHub Issues와 milestones는 아직 없고, 지금까지의 제품 방향과 작업 이력은 PR, release note, `docs/superpowers/specs`, `docs/superpowers/plans`에 분산되어 있다.
+공개 최신 릴리스는 v0.1.6이며 현재 `main`과 일치한다. 이 로드맵을 GitHub에 반영하기 전 기준으로 GitHub Issues와 milestones는 아직 없었고, 지금까지의 제품 방향과 작업 이력은 PR, release note, `docs/superpowers/specs`, `docs/superpowers/plans`에 분산되어 있었다.
 
 이 문서는 현재 제품 상태와 경쟁 제품의 검증된 패턴을 바탕으로, 소비자에게 전달되는 품질을 최우선으로 하면서 Zap이 장기적으로 확장할 기능을 순차 GitHub Issue와 milestone으로 정의한다.
 
