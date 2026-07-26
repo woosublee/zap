@@ -355,7 +355,7 @@ gh label list --repo woosublee/zap --limit 100 --json name,color,description \
   > /tmp/zap-roadmap-sync/labels-after.json
 ```
 
-Use Python to assert that all 22 new canonical labels exist once with matching colors and descriptions and that `bug`, `documentation`, `enhancement` exist.
+Use Python to assert that all 21 canonical labels exist once with matching colors and descriptions and that `bug`, `documentation`, `enhancement` exist.
 
 Expected: zero missing or duplicate canonical labels.
 
