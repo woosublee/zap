@@ -651,7 +651,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
 
     private func makeModel(
         dockItems: [DockItem] = [],
-        appLauncher: CapturingAppLauncher = CapturingAppLauncher(),
+        appLauncher: CapturingAppLauncher? = nil,
         windowManagementModel: WindowManagementModel,
         hotKeyService: CapturingHotKeyService,
         userDefaults: UserDefaults = .standard,
@@ -662,7 +662,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
     ) -> ZapAppModel {
         ZapAppModel(
             dockItemProvider: StubDockItemProvider(items: dockItems),
-            appLauncher: appLauncher,
+            appLauncher: appLauncher ?? CapturingAppLauncher(),
             loginItemService: StubLoginItemService(),
             updateService: UpdateService(driverFactory: { StubUpdateDriver() }, buildTagProvider: { nil }),
             windowManagementModel: windowManagementModel,
@@ -861,12 +861,17 @@ private struct StubDockItemProvider: DockItemProviding {
 private final class CapturingAppLauncher: AppLaunching {
     var activatedItems: [DockItem] = []
     var activateFinderCallCount = 0
+    var nextOutcome: AppLaunchOutcome = .activated
     var onActivateOrLaunch: (() -> Void)?
     var onActivateFinder: (() -> Void)?
 
-    func activateOrLaunch(_ item: DockItem) {
+    func activateOrLaunch(
+        _ item: DockItem,
+        completion: @escaping (AppLaunchOutcome) -> Void
+    ) {
         activatedItems.append(item)
         onActivateOrLaunch?()
+        completion(nextOutcome)
     }
 
     func activateFinder() {

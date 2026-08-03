@@ -138,7 +138,7 @@ final class ZapAppModel: ObservableObject {
 
     init(
         dockItemProvider: any DockItemProviding = DockItemProvider(),
-        appLauncher: any AppLaunching = AppLauncher(),
+        appLauncher: (any AppLaunching)? = nil,
         loginItemService: any LoginItemControlling = LoginItemService(),
         updateService: UpdateService,
         windowManagementModel: WindowManagementModel? = nil,
@@ -170,7 +170,7 @@ final class ZapAppModel: ObservableObject {
         }
     ) {
         self.dockItemProvider = dockItemProvider
-        self.appLauncher = appLauncher
+        self.appLauncher = appLauncher ?? AppLauncher()
         self.loginItemService = loginItemService
         self.updateService = updateService
         self.windowManagementModel = windowManagementModel ?? WindowManagementModel()
@@ -334,7 +334,7 @@ final class ZapAppModel: ObservableObject {
             NSSound.beep()
             return
         }
-        appLauncher.activateOrLaunch(item)
+        appLauncher.activateOrLaunch(item) { _ in }
     }
 
     func activateFinder() {
@@ -380,7 +380,7 @@ final class ZapAppModel: ObservableObject {
             NSSound.beep()
             return
         }
-        appLauncher.activateOrLaunch(shortcut.dockItem)
+        appLauncher.activateOrLaunch(shortcut.dockItem) { _ in }
     }
 
     var activeManualShortcuts: [ManualShortcut] {
