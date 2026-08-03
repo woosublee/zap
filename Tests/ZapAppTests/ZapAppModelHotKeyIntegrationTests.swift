@@ -416,6 +416,64 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertFalse(model.areHotKeysPaused)
     }
 
+    func testToggleHotKeysDisablesAndEnablesExactApplicationSnapshot() {
+        let suiteName = "ToggleOutcome.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let safari = ActiveApplication(
+            name: "Safari",
+            bundleIdentifier: "com.apple.Safari"
+        )
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            userDefaults: defaults
+        )
+
+        XCTAssertEqual(model.toggleHotKeys(for: safari), .disabled(safari))
+        XCTAssertEqual(model.disabledApplications, [safari.bundleIdentifier: safari.name])
+        XCTAssertEqual(model.toggleHotKeys(for: safari), .enabled(safari))
+        XCTAssertEqual(model.disabledApplications, [:])
+    }
+
+    func testToggleHotKeysReturnsNoActiveApplicationWithoutMutationOrBeep() {
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService()
+        )
+
+        XCTAssertEqual(model.toggleHotKeys(for: nil), .noActiveApplication)
+        XCTAssertEqual(model.disabledApplications, [:])
+    }
+
+    func testMenuConvenienceUsesFreshProviderInsteadOfCachedApplication() {
+        let safari = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        let notes = ActiveApplication(name: "Notes", bundleIdentifier: "com.apple.Notes")
+        var providerApplication: ActiveApplication? = safari
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            activeApplicationProvider: { providerApplication }
+        )
+        XCTAssertEqual(model.activeApplication, safari)
+        providerApplication = notes
+
+        let outcome = model.toggleHotKeysForActiveApplication()
+
+        XCTAssertEqual(outcome, .disabled(notes))
+        XCTAssertEqual(model.activeApplication, notes)
+        XCTAssertEqual(model.disabledApplications, [notes.bundleIdentifier: notes.name])
+    }
+
     func testDisabledActiveApplicationKeepsOnlyControlRegistrationAndSecondToggleRestoresAll() {
         let suiteName = "ActiveApplicationToggleScope.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -448,7 +506,10 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         hotKeyService.registrations.removeAll()
         hotKeyService.unregisterCallCount = 0
 
-        model.toggleHotKeysForActiveApplication()
+        XCTAssertEqual(
+            model.toggleHotKeysForActiveApplication(),
+            .disabled(ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari"))
+        )
 
         XCTAssertTrue(model.isActiveApplicationDisabled)
         XCTAssertEqual(hotKeyService.unregisterCallCount, 0)
@@ -457,7 +518,10 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
             .activeApplicationToggleOnly
         )
 
-        model.toggleHotKeysForActiveApplication()
+        XCTAssertEqual(
+            model.toggleHotKeysForActiveApplication(),
+            .enabled(ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari"))
+        )
 
         XCTAssertFalse(model.isActiveApplicationDisabled)
         XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
@@ -495,7 +559,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(hotKeyService.registrations, [])
     }
 
-    func testMissingActiveApplicationDoesNotChangeDisabledStateOrPersistence() async {
+    func testMissingActiveApplicationDoesNotChangeDisabledStateOrPersistence() {
         let suiteName = "ActiveApplicationToggleMissingApp.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -512,8 +576,10 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         )
         hotKeyService.registrations.removeAll()
 
-        hotKeyService.onActiveApplicationToggleHotKey?()
-        await Task.yield()
+        XCTAssertEqual(
+            model.toggleHotKeysForActiveApplication(),
+            .noActiveApplication
+        )
 
         XCTAssertEqual(model.disabledApplications, [:])
         XCTAssertNil(defaults.dictionary(forKey: "disabled_hot_key_applications"))

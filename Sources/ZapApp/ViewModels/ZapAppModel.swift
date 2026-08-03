@@ -19,6 +19,12 @@ struct ActiveApplication: Equatable {
     }
 }
 
+enum ActiveApplicationToggleOutcome: Equatable {
+    case disabled(ActiveApplication)
+    case enabled(ActiveApplication)
+    case noActiveApplication
+}
+
 protocol HotKeyPauseScheduling: AnyObject {
     func schedule(after interval: TimeInterval, action: @escaping () -> Void)
     func cancel()
@@ -262,15 +268,32 @@ final class ZapAppModel: ObservableObject {
         registerHotKeys()
     }
 
-    func toggleHotKeysForActiveApplication() {
-        guard let application = activeApplication else { return }
+    @discardableResult
+    func toggleHotKeys(
+        for application: ActiveApplication?
+    ) -> ActiveApplicationToggleOutcome {
+        guard let application else {
+            return .noActiveApplication
+        }
+
+        activeApplication = application
+        let outcome: ActiveApplicationToggleOutcome
         if disabledApplications[application.bundleIdentifier] != nil {
             disabledApplications.removeValue(forKey: application.bundleIdentifier)
+            outcome = .enabled(application)
         } else {
             disabledApplications[application.bundleIdentifier] = application.name
+            outcome = .disabled(application)
         }
+
         userDefaults.set(disabledApplications, forKey: Self.disabledApplicationsKey)
         registerHotKeys()
+        return outcome
+    }
+
+    @discardableResult
+    func toggleHotKeysForActiveApplication() -> ActiveApplicationToggleOutcome {
+        toggleHotKeys(for: activeApplicationProvider())
     }
 
     func refreshDockItems() {
