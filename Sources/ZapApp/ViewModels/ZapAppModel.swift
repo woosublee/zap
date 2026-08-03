@@ -197,7 +197,7 @@ final class ZapAppModel: ObservableObject {
         self.activeApplicationProvider = activeApplicationProvider
         self.workspaceNotificationCenter = workspaceNotificationCenter
         self.pauseScheduler = pauseScheduler
-        self.shortcutHUDPresenter = shortcutHUDPresenter ?? NoOpShortcutHUDPresenter()
+        self.shortcutHUDPresenter = shortcutHUDPresenter ?? ShortcutHUDPresenter()
         self.shortcutHUDScreenResolver = shortcutHUDScreenResolver ?? ShortcutHUDScreenResolver()
         self.shortcutHUDLocalizedDisplayName = shortcutHUDLocalizedDisplayName
         self.beep = beep
