@@ -140,6 +140,30 @@ class ShortcutHUDPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+enum ShortcutHUDTiming {
+    static let announcementDelay: TimeInterval = 0.10
+    static let opacityEntryDuration: TimeInterval = 0.10
+    static let initialScale: CGFloat = 0.86
+    static let springResponse: TimeInterval = 0.24
+    static let springDampingFraction: Double = 0.72
+    static let springSettlingDuration: TimeInterval = 0.36
+    static let stableHoldDuration: TimeInterval = 1.20
+    static let fadeOutDuration: TimeInterval = 0.09
+
+    private static let springFadeDelay: TimeInterval = 1.56
+    private static let reducedMotionFadeDelay: TimeInterval = 1.30
+    private static let springHideDelay: TimeInterval = 1.65
+    private static let reducedMotionHideDelay: TimeInterval = 1.39
+
+    static func fadeDelay(usesScaleAnimation: Bool) -> TimeInterval {
+        usesScaleAnimation ? springFadeDelay : reducedMotionFadeDelay
+    }
+
+    static func hideDelay(usesScaleAnimation: Bool) -> TimeInterval {
+        usesScaleAnimation ? springHideDelay : reducedMotionHideDelay
+    }
+}
+
 @MainActor
 final class ShortcutHUDViewModel: ObservableObject {
     @Published var icon: NSImage?
@@ -152,7 +176,6 @@ final class ShortcutHUDViewModel: ObservableObject {
 final class ShortcutHUDPresenter: ShortcutHUDPresenting {
     enum Phase: Equatable {
         case hidden
-        case appearing
         case visible
         case fadingOut
     }
@@ -242,7 +265,10 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
             panel.setFrame(ShortcutHUDLayout.panelFrame(on: display), display: false)
             do {
                 try showOrRefreshPanel(presentation: presentation)
-                scheduleFadeAndHide(generation: requestGeneration)
+                scheduleFadeAndHide(
+                    generation: requestGeneration,
+                    presentation: presentation
+                )
             } catch {
                 panel.orderOut(nil)
                 phase = .hidden
@@ -252,11 +278,10 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
             phase = .hidden
         }
 
-        announcementScheduler.schedule(after: 0.10) { [weak self] in
+        announcementScheduler.schedule(
+            after: ShortcutHUDTiming.announcementDelay
+        ) { [weak self] in
             guard let self, requestGeneration == self.generation else { return }
-            if self.phase == .appearing {
-                self.phase = .visible
-            }
             try? self.announcer.announce(presentation.announcement)
         }
     }
@@ -275,14 +300,28 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
         switch phase {
         case .hidden:
             viewModel.opacity = 0
-            viewModel.scale = presentation.usesScaleAnimation ? 0.96 : 1
+            viewModel.scale = presentation.usesScaleAnimation
+                ? ShortcutHUDTiming.initialScale
+                : 1
             try orderFront(panel)
-            phase = .appearing
-            withAnimation(.easeOut(duration: 0.10)) {
+            phase = .visible
+            withAnimation(
+                .easeOut(duration: ShortcutHUDTiming.opacityEntryDuration)
+            ) {
                 viewModel.opacity = 1
-                viewModel.scale = 1
             }
-        case .appearing, .visible:
+            if presentation.usesScaleAnimation {
+                withAnimation(
+                    .spring(
+                        response: ShortcutHUDTiming.springResponse,
+                        dampingFraction: ShortcutHUDTiming.springDampingFraction,
+                        blendDuration: 0
+                    )
+                ) {
+                    viewModel.scale = 1
+                }
+            }
+        case .visible:
             break
         case .fadingOut:
             withAnimation(nil) {
@@ -293,15 +332,28 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
         }
     }
 
-    private func scheduleFadeAndHide(generation requestGeneration: Int) {
-        fadeScheduler.schedule(after: 0.65) { [weak self] in
+    private func scheduleFadeAndHide(
+        generation requestGeneration: Int,
+        presentation: ShortcutHUDPresentation
+    ) {
+        fadeScheduler.schedule(
+            after: ShortcutHUDTiming.fadeDelay(
+                usesScaleAnimation: presentation.usesScaleAnimation
+            )
+        ) { [weak self] in
             guard let self, requestGeneration == self.generation else { return }
             self.phase = .fadingOut
-            withAnimation(.easeIn(duration: 0.15)) {
+            withAnimation(
+                .easeOut(duration: ShortcutHUDTiming.fadeOutDuration)
+            ) {
                 self.viewModel.opacity = 0
             }
         }
-        hideScheduler.schedule(after: 0.80) { [weak self] in
+        hideScheduler.schedule(
+            after: ShortcutHUDTiming.hideDelay(
+                usesScaleAnimation: presentation.usesScaleAnimation
+            )
+        ) { [weak self] in
             guard let self, requestGeneration == self.generation else { return }
             self.panel.orderOut(nil)
             self.phase = .hidden

@@ -248,6 +248,10 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         hotKeyService.onFinderHotKey?()
         await Task.yield()
         XCTAssertEqual(launcher.activateFinderCallCount, 1)
+        XCTAssertEqual(
+            presenter.presentations.map(\.payload.appName),
+            ["Terminal", "Finder"]
+        )
 
         hotKeyService.onManualHotKey?(manualID)
         await Task.yield()
@@ -258,7 +262,10 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(windowPerformer.performedActions, [.leftHalf])
         XCTAssertEqual(launcher.activatedItems, [dockItem, manual.dockItem])
         XCTAssertEqual(launcher.activateFinderCallCount, 1)
-        XCTAssertEqual(presenter.presentations.count, presentationCountAfterDock)
+        XCTAssertEqual(
+            presenter.presentations.count,
+            presentationCountAfterDock + 1
+        )
         _ = model
     }
 
@@ -303,6 +310,73 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
                 display: display
             )]
         )
+        _ = model
+    }
+
+    func testFinderHotKeyPresentsCanonicalPayloadOnCapturedDisplay() async {
+        let display = DisplayFrame(
+            frame: CGRect(x: 1000, y: 0, width: 1000, height: 800),
+            visibleFrame: CGRect(x: 1000, y: 25, width: 1000, height: 775),
+            isMain: false
+        )
+        let launcher = CapturingAppLauncher()
+        launcher.nextFinderOutcome = .launched
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter,
+            shortcutHUDScreenResolver: StubShortcutHUDScreenResolver(
+                display: display
+            )
+        )
+
+        hotKeyService.onFinderHotKey?()
+        await Task.yield()
+
+        XCTAssertEqual(
+            presenter.presentations,
+            [.init(
+                payload: ShortcutHUDPayload(
+                    action: .appActivated,
+                    appName: "Finder",
+                    bundleIdentifier: "com.apple.finder",
+                    applicationURL: nil
+                ),
+                display: display
+            )]
+        )
+        _ = model
+    }
+
+    func testFailedFinderHotKeyDoesNotBeepOrPresentHUD() async {
+        var modelBeepCount = 0
+        let launcher = CapturingAppLauncher()
+        launcher.nextFinderOutcome = .failed
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter,
+            beep: { modelBeepCount += 1 }
+        )
+
+        hotKeyService.onFinderHotKey?()
+        await Task.yield()
+
+        XCTAssertEqual(launcher.activateFinderCallCount, 1)
+        XCTAssertEqual(modelBeepCount, 0)
+        XCTAssertTrue(presenter.presentations.isEmpty)
         _ = model
     }
 
@@ -714,6 +788,95 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         _ = model
     }
 
+    func testLateFinderCompletionCannotReplaceNewerDockHUD() async {
+        let item = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let launcher = CapturingAppLauncher()
+        launcher.defersFinderCompletion = true
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [item],
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter
+        )
+
+        hotKeyService.onFinderHotKey?()
+        await Task.yield()
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+        launcher.completeFinderActivation(at: 0, with: .activated)
+
+        XCTAssertEqual(presenter.presentations.map(\.payload.appName), ["Terminal"])
+        _ = model
+    }
+
+    func testNewerFailedFinderRequestSuppressesOlderLateDockSuccess() async {
+        let item = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let launcher = CapturingAppLauncher()
+        launcher.defersCompletion = true
+        launcher.nextFinderOutcome = .failed
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [item],
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter
+        )
+
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+        hotKeyService.onFinderHotKey?()
+        await Task.yield()
+        launcher.completeLaunch(at: 0, with: .launched)
+
+        XCTAssertTrue(presenter.presentations.isEmpty)
+        _ = model
+    }
+
+    func testNewerFailedFinderRequestSuppressesOlderFinderSuccess() async {
+        let launcher = CapturingAppLauncher()
+        launcher.defersFinderCompletion = true
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter
+        )
+
+        hotKeyService.onFinderHotKey?()
+        await Task.yield()
+        hotKeyService.onFinderHotKey?()
+        await Task.yield()
+        launcher.completeFinderActivation(at: 1, with: .failed)
+        launcher.completeFinderActivation(at: 0, with: .activated)
+
+        XCTAssertTrue(presenter.presentations.isEmpty)
+        _ = model
+    }
+
     func testToggleHotKeysDisablesAndEnablesExactApplicationSnapshot() {
         let suiteName = "ToggleOutcome.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -992,6 +1155,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
             bundleIdentifier: "com.apple.Terminal"
         )
         let launcher = CapturingAppLauncher()
+        let presenter = CapturingShortcutHUDPresenter()
         let windowPerformer = CapturingWindowManagementPerformer()
         let windowModel = WindowManagementModel(
             service: windowPerformer,
@@ -1001,7 +1165,8 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
             dockItems: [dockItem],
             appLauncher: launcher,
             windowManagementModel: windowModel,
-            hotKeyService: CapturingHotKeyService()
+            hotKeyService: CapturingHotKeyService(),
+            shortcutHUDPresenter: presenter
         )
 
         model.pauseHotKeysIndefinitely()
@@ -1012,6 +1177,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(launcher.activatedItems, [dockItem])
         XCTAssertEqual(launcher.activateFinderCallCount, 1)
         XCTAssertEqual(windowPerformer.performedActions, [.leftHalf])
+        XCTAssertTrue(presenter.presentations.isEmpty)
     }
 
     func testHotKeyRegistrationErrorAndWindowShortcutValidationErrorRemainSeparate() {
@@ -1291,11 +1457,18 @@ private final class CapturingAppLauncher: AppLaunching {
         let completion: (AppLaunchOutcome) -> Void
     }
 
+    struct PendingFinderActivation {
+        let completion: (AppLaunchOutcome) -> Void
+    }
+
     var activatedItems: [DockItem] = []
     var activateFinderCallCount = 0
     var nextOutcome: AppLaunchOutcome = .activated
+    var nextFinderOutcome: AppLaunchOutcome = .activated
     var defersCompletion = false
+    var defersFinderCompletion = false
     var pendingLaunches: [PendingLaunch] = []
+    var pendingFinderActivations: [PendingFinderActivation] = []
     var onActivateOrLaunch: (() -> Void)?
     var onActivateFinder: (() -> Void)?
 
@@ -1316,9 +1489,25 @@ private final class CapturingAppLauncher: AppLaunching {
         pendingLaunches[index].completion(outcome)
     }
 
-    func activateFinder() {
+    func activateFinder(
+        completion: @escaping (AppLaunchOutcome) -> Void
+    ) {
         activateFinderCallCount += 1
         onActivateFinder?()
+        if defersFinderCompletion {
+            pendingFinderActivations.append(
+                PendingFinderActivation(completion: completion)
+            )
+        } else {
+            completion(nextFinderOutcome)
+        }
+    }
+
+    func completeFinderActivation(
+        at index: Int,
+        with outcome: AppLaunchOutcome
+    ) {
+        pendingFinderActivations[index].completion(outcome)
     }
 }
 

@@ -9,20 +9,20 @@ Spectacle은 Dock 앱 호출 단축키를 사용할 때 화면 중앙에 해당 
 ## 목표
 
 1. Automatic Dock 단축키로 앱 활성화 또는 실행에 성공하면 현재 작업 화면 중앙에 해당 앱 아이콘 HUD를 표시한다.
-2. 현재 앱에서 Zap 단축키를 비활성화하면 앱 아이콘과 빨간 `−` badge를 표시한다.
-3. 현재 앱에서 Zap 단축키를 다시 활성화하면 앱 아이콘과 초록 `✓` badge를 표시한다.
-4. 단축키 ID 인식이 아니라 실제 action 성공 이후에만 HUD를 표시한다.
-5. HUD가 대상 앱의 활성화나 사용자 입력 focus를 방해하지 않게 한다.
-6. 요청 시점부터 0.80초 후 사라지는 비차단 피드백으로 구현한다.
-7. Reduce Motion, Reduce Transparency, VoiceOver를 고려한다.
+2. Finder global shortcut으로 Finder 활성화 또는 실행에 성공하면 같은 화면에 Finder 아이콘 HUD를 표시한다.
+3. 현재 앱에서 Zap 단축키를 비활성화하면 앱 아이콘과 빨간 `−` badge를 표시한다.
+4. 현재 앱에서 Zap 단축키를 다시 활성화하면 앱 아이콘과 초록 `✓` badge를 표시한다.
+5. 단축키 ID 인식이 아니라 실제 action 성공 이후에만 HUD를 표시한다.
+6. HUD가 대상 앱의 활성화나 사용자 입력 focus를 방해하지 않게 한다.
+7. 빠르게 나타나 한 번만 작게 반동하고, 선명한 상태를 충분히 유지한 뒤 opacity만 빠르게 사라지는 비차단 피드백으로 구현한다.
+8. Reduce Motion, Reduce Transparency, VoiceOver를 고려한다.
 
 ## 비목표
 
 - Manual 앱 단축키 HUD
-- Finder 호출 HUD
 - Window Management 단축키 HUD
 - 향후 같은 앱의 window cycle 동작 HUD
-- 메뉴 클릭으로 실행한 앱 또는 앱별 Enable/Disable HUD
+- 메뉴 클릭으로 실행한 Dock 앱, Finder 또는 앱별 Enable/Disable HUD
 - 전역 Pause/Resume HUD
 - 실패 상태를 표현하는 오류 HUD
 - 앱 이름이나 상태 문구를 화면에 표시하는 확장형 HUD
@@ -38,9 +38,20 @@ Spectacle은 Dock 앱 호출 단축키를 사용할 때 화면 중앙에 해당 
 3. 해당 번호의 `DockItem`을 한 번 resolve한다.
 4. 대상 앱이 실행 중이면 활성화하고, 실행 중이 아니면 새로 실행한다.
 5. 활성화 또는 실행 성공을 확인한 후 같은 `DockItem`의 application URL과 bundle identifier를 HUD payload에 복사한다.
-6. Presenter는 payload로 실제 앱 아이콘을 resolve하고, HUD는 요청 시점부터 0.80초 후 사라진다.
+6. Presenter는 payload로 실제 앱 아이콘을 resolve하고 새 HUD lifecycle을 시작한다.
 
 대상 Dock slot이 없으면 hotkey wrapper가 beep를 정확히 한 번 내고 HUD를 표시하지 않는다. 앱 활성화·실행에 실패하면 launcher가 기존 beep를 정확히 한 번 내고 `.failed`를 반환하며, 호출자는 beep를 추가하지 않고 HUD도 표시하지 않는다.
+
+### Finder global shortcut
+
+1. 사용자가 Finder global shortcut을 누른다.
+2. Zap은 다른 HUD 대상 hotkey와 같은 generation을 발급하고 입력 직전 대상 화면을 보관한다.
+3. Finder가 실행 중이면 `.activateAllWindows`와 `.activateIgnoringOtherApps`로 활성화를 시도한다.
+4. Activation이 성공하면 기존 reopen event를 보내고 `.activated`를 반환한다.
+5. Finder가 실행 중이 아니면 `NSWorkspace.openApplication` completion에서 error가 없고 running application이 반환된 경우에만 `.launched`를 반환한다.
+6. `.activated` 또는 `.launched`인 최신 요청만 `Finder`, `com.apple.finder` metadata로 badge 없는 Finder icon HUD를 표시한다.
+
+Finder activation 또는 launch가 실패하면 launcher가 beep를 정확히 한 번 내고 HUD를 표시하지 않는다. 메뉴에서 Finder를 호출할 때는 같은 launcher를 사용하되 outcome을 무시하고 HUD presenter를 호출하지 않는다.
 
 ### 현재 앱에서 Zap 비활성화
 
@@ -61,6 +72,8 @@ HUD는 승인된 아이콘 중심 A안을 사용한다.
 - corner radius: 32pt
 - 위치: 선택된 화면 전체 frame의 정중앙
 - 배경: 어두운 반투명 material
+- 외곽선: top-leading white highlight에서 bottom-trailing의 옅은 blue/white로 이어지는 얇은 gradient glass stroke
+- 내부 경계: card 안쪽 4pt 지점의 낮은 opacity inner highlight
 - shadow: 화면 배경과 분리되는 부드러운 외곽 shadow
 - 앱 아이콘: 76×76pt
 - 앱 활성화 또는 실행: badge 없음
@@ -72,15 +85,21 @@ HUD는 승인된 아이콘 중심 A안을 사용한다.
 
 ## 표시 시간과 animation
 
-각 HUD 요청의 총 lifecycle은 요청 시점부터 0.80초다.
+기본 animation은 비교 prototype의 C(Spring overshoot)를 production에 맞게 완화한 모션을 사용한다.
 
-1. fade-in과 `0.96 → 1.0` scale: 0.10초
-2. 유지: 0.55초
-3. fade-out 후 panel 숨김: 0.15초
+1. opacity entry: 0.10초 ease-out
+2. card 전체 scale: `0.86 → 1.0`, `response: 0.24`, `dampingFraction: 0.72`, `blendDuration: 0` spring
+3. spring 안정 시간: 약 0.36초
+4. 안정된 선명 상태 유지: 1.20초
+5. 요청 후 1.56초에 opacity-only fade-out 시작
+6. fade-out: 0.09초 ease-out
+7. 요청 후 1.65초에 panel 숨김
+
+Spring은 card, icon, badge 전체에 적용하고 한 번만 작게 반동한 뒤 즉시 안정되어야 한다. 퇴장 시 scale, blur, 잔상 layer는 변경하거나 추가하지 않는다. Glass outer stroke와 inner highlight도 고정된 상태로 유지한다.
 
 빠르게 연속 입력하면 기존 dismiss 작업을 취소하고 새 payload와 대상 화면으로 숨김 없이 즉시 교체한다. 이미 panel이 표시 중이면 entry animation은 재시작하지 않고 현재 opacity와 scale을 유지하며, fade-out 시작 시점과 hide deadline만 새 요청을 기준으로 다시 계산한다. 새 요청의 대상 화면이 바뀌면 panel도 새 화면 중앙으로 이동한다. Timing 테스트의 허용 오차는 ±0.05초다.
 
-Reduce Motion이 활성화되면 scale animation을 제거하고 opacity만 변경한다. Reduce Transparency가 활성화되면 반투명 material 대신 불투명도가 높은 어두운 배경을 사용한다.
+Reduce Motion이 활성화되면 scale/spring을 제거한다. 0.10초 opacity entry 후 1.20초 유지하고 요청 후 1.30초에 0.09초 opacity-only fade-out을 시작해 1.39초에 panel을 숨긴다. Reduce Transparency가 활성화되면 반투명 material 대신 불투명도가 높은 어두운 배경을 사용하며 glass 경계 표현은 유지한다.
 
 ## 실행 결과 모델
 
@@ -100,16 +119,20 @@ protocol AppLaunching {
         completion: @escaping (AppLaunchOutcome) -> Void
     )
 
-    func activateFinder()
+    func activateFinder(
+        completion: @escaping (AppLaunchOutcome) -> Void
+    )
 }
 ```
 
 - 주입된 실행 중 앱 activation operation은 `Bool`을 반환한다. `true`는 `.activated`, `false`는 `.failed`다.
 - `NSWorkspace.openApplication` completion에서 error가 없고 running application이 반환된 경우에만 `.launched`다.
 - Activation 또는 open completion 실패는 `.failed`다.
+- Finder running activation은 성공했을 때만 기존 reopen event를 보낸다.
+- Dock과 Finder completion 및 실패 beep는 method-local exactly-once guard를 통과한다.
 - Completion은 main actor에서 정확히 한 번 전달한다.
 
-`AppLaunching`은 activation/open 실패 beep의 유일한 owner다. 기존 open 실패 beep를 유지하고, 실행 중 앱 activation 실패에는 같은 정책의 beep를 새로 추가한다. 실패 시 beep를 정확히 한 번 낸 뒤 `.failed` completion을 전달하며, hotkey와 menu caller는 `.failed`에 대해 추가 beep를 내지 않는다. 호출자는 `.activated`와 `.launched`일 때만 HUD를 요청한다. Dock slot 자체가 없는 경우는 launcher를 호출하지 않으므로 hotkey wrapper가 beep를 정확히 한 번 담당한다. Manual shortcut은 같은 비동기 launcher를 사용하되 outcome을 무시하고 HUD presenter를 호출하지 않는다.
+`AppLaunching`은 Dock과 Finder activation/open 실패 beep의 유일한 owner다. 실패 시 beep를 정확히 한 번 낸 뒤 `.failed` completion을 전달하며, hotkey와 menu caller는 `.failed`에 대해 추가 beep를 내지 않는다. 호출자는 `.activated`와 `.launched`일 때만 HUD를 요청한다. Dock slot 자체가 없는 경우는 launcher를 호출하지 않으므로 hotkey wrapper가 beep를 정확히 한 번 담당한다. Manual shortcut과 Finder menu action은 같은 비동기 launcher를 사용하되 outcome을 무시하고 HUD presenter를 호출하지 않는다.
 
 앱별 상태 mutation도 입력 시점의 단일 앱 snapshot과 실제 변경 결과를 사용해야 한다.
 
@@ -149,9 +172,9 @@ HUD payload에는 다음 정보가 포함된다.
 - bundle identifier
 - 가능한 경우 application URL
 
-Automatic Dock wrapper는 `DockItem`을 정확히 한 번 resolve하고, 그 item의 application URL과 bundle identifier를 payload에 복사한다. Presenter는 Dock 목록이나 `DockItem`을 다시 조회하지 않는다. 앱 icon resolve 순서는 application URL → bundle identifier → macOS 기본 application icon이다.
+`ShortcutHUDApplication`은 HUD에 필요한 앱 이름, bundle identifier, 가능한 application URL을 값으로 보관한다. Automatic Dock wrapper는 `DockItem`을 정확히 한 번 resolve하고 같은 item으로 이 값을 만든다. Finder는 canonical metadata `Finder`, `com.apple.finder`, URL 없음으로 같은 payload pipeline을 사용한다. Presenter는 Dock 목록, `DockItem`, Finder 상태를 다시 조회하지 않는다. 앱 icon resolve 순서는 application URL → bundle identifier → macOS 기본 application icon이다.
 
-Automatic Dock payload의 non-empty 앱 이름은 application URL의 localized display name → `DockItem.name` → bundle identifier 순으로 wrapper가 확정한다. Active-app toggle은 `ActiveApplication.name` → bundle identifier 순으로 확정한다. Presenter는 앱 이름을 다시 resolve하지 않는다. 앱 이름은 화면 텍스트가 아니라 accessibility announcement에 사용한다.
+Automatic Dock의 non-empty 앱 이름은 application URL의 localized display name → `DockItem.name` → bundle identifier → URL filename 순으로 확정한다. Finder는 `Finder`를 사용하고, Active-app toggle은 `ActiveApplication.name` → bundle identifier 순으로 확정한다. Presenter는 앱 이름을 다시 resolve하지 않는다. 앱 이름은 화면 텍스트가 아니라 accessibility announcement에 사용한다.
 
 Action과 accessibility 환경을 시각·의미 표현으로 바꾸는 로직은 pure `ShortcutHUDPresentation` mapping으로 분리한다. 이 값은 badge symbol, semantic badge role/color, announcement 문자열, scale animation 사용 여부, transparency fallback 여부를 표현하며 `Equatable`이어야 한다. 실제 `NSImage`, material, shadow rendering은 이 mapping 밖의 presenter/view가 담당한다.
 
@@ -185,6 +208,8 @@ func activateDockItem(
 
 func handleDockHotKey(_ key: NumberKey)
 func activateDockItemFromMenu(for key: NumberKey)
+func handleFinderHotKey()
+func activateFinder()
 ```
 
 ```text
@@ -196,6 +221,11 @@ handleDockHotKey
   → launcher outcome 확인
   → 성공 outcome과 같은 item metadata를 appActivated HUD로 변환
 
+handleFinderHotKey
+  → 대상 화면 frame snapshot capture
+  → Finder launcher outcome 확인
+  → 성공 outcome과 canonical Finder metadata를 appActivated HUD로 변환
+
 Active-app toggle hotkey wrapper
   → 대상 화면 frame snapshot capture
   → fresh ActiveApplication 정확히 한 번 resolve
@@ -203,16 +233,16 @@ Active-app toggle hotkey wrapper
   → 반환된 application으로 disabled/enabled HUD 생성
 ```
 
-`GlobalHotKeyService.onDockHotKey`는 menu-facing method가 아니라 `handleDockHotKey`에 연결한다. `activateDockItemFromMenu`는 item을 resolve해 같은 launcher를 호출할 수 있지만 outcome을 무시하고 HUD를 표시하지 않는다. Launcher completion에서 `DockItem`을 다시 resolve하지 않는다.
+`GlobalHotKeyService.onDockHotKey`는 `handleDockHotKey`, `onFinderHotKey`는 `handleFinderHotKey`에 연결한다. `activateDockItemFromMenu`와 menu-facing `activateFinder`는 같은 launcher를 호출할 수 있지만 outcome을 무시하고 HUD를 표시하지 않는다. Launcher completion에서 `DockItem`이나 Finder metadata를 다시 resolve하지 않는다.
 
-모든 HUD 대상 hotkey 입력에는 `ZapAppModel`이 단조 증가하는 request generation을 부여한다. 비동기 launcher completion이 돌아왔을 때 capture한 generation이 최신 HUD hotkey 입력과 다르면 presenter와 accessibility announcement를 요청하지 않는다. 따라서 A 입력 후 B 입력의 completion이 역순으로 도착해도 최신 입력 B의 성공 결과만 표시한다. 최신 입력 B가 실패한 경우에도 이전 A의 늦은 성공 completion은 표시하지 않는다. 이미 A completion과 HUD가 전달된 뒤 B 입력이 들어온 경우에는 서로 별개의 action으로 처리한다.
+모든 HUD 대상 hotkey 입력에는 `ZapAppModel`이 단조 증가하는 request generation을 부여한다. Automatic Dock, Finder, active-app toggle은 같은 generation을 공유한다. 비동기 launcher completion이 돌아왔을 때 capture한 generation이 최신 HUD hotkey 입력과 다르면 presenter와 accessibility announcement를 요청하지 않는다. 따라서 Dock과 Finder 입력의 completion이 역순으로 도착해도 최신 입력의 성공 결과만 표시한다. 최신 입력이 실패한 경우에도 이전 요청의 늦은 성공 completion은 표시하지 않는다. 이미 이전 completion과 HUD가 전달된 뒤 새 입력이 들어온 경우에는 서로 별개의 action으로 처리한다.
 
 다음 경로는 HUD presenter를 호출하지 않는다.
 
 - 메뉴의 Dock 앱 실행
+- 메뉴의 Finder 실행
 - 메뉴의 앱별 Enable/Disable
 - Manual shortcut
-- Finder shortcut
 - Window Management shortcut
 
 ## 화면 선택
@@ -278,7 +308,7 @@ protocol ShortcutHUDScheduling: AnyObject {
 
 Presenter는 각 `present`마다 단조 증가하는 request generation을 발급하고 pending fade-out, hide, announcement 작업을 취소한다. 모든 delayed callback은 capture한 generation이 현재 generation과 일치할 때만 panel 또는 announcement state를 변경한다. 실제 시간 대기 대신 capturing scheduler로 테스트할 수 있어야 한다.
 
-Presenter는 새 표시 요청을 받으면 icon과 badge를 갱신하고, card 중심을 정하고, 0.80초 lifecycle을 시작한다. Fade-in 중 새 요청은 현재 progress를 유지한 채 기존 fade-in을 완료한다. 유지 구간의 새 요청은 opacity 1.0과 scale 1.0을 유지한다. Fade-out 중 새 요청은 fade-out을 취소하고 opacity와 scale을 즉시 1.0으로 복원한 뒤 새 요청 기준의 유지 및 fade-out 일정을 시작한다. 모든 경우 panel을 숨기거나 entry animation을 처음부터 재시작하지 않는다.
+Presenter는 새 표시 요청을 받으면 icon과 badge를 갱신하고, card 중심을 정하고, accessibility 환경에 맞는 lifecycle을 시작한다. Visual phase는 `.hidden`, `.visible`, `.fadingOut`으로 유지하고 VoiceOver의 0.10초 debounce가 visual phase를 변경하지 않게 한다. Entry 중 새 요청은 현재 spring progress를 유지한 채 완료한다. 유지 구간의 새 요청은 opacity 1.0과 scale 1.0을 유지한다. Fade-out 중 새 요청은 fade-out을 취소하고 opacity와 scale을 즉시 1.0으로 복원한 뒤 새 요청 기준의 유지 및 fade-out 일정을 시작한다. 모든 경우 panel을 숨기거나 entry animation을 처음부터 재시작하지 않는다.
 
 ## 접근성
 
@@ -299,6 +329,7 @@ Non-activating panel이 accessibility focus를 가져가지 않으므로 HUD와 
 | Dock slot 없음 | hotkey wrapper가 beep 1회, HUD 없음 |
 | 실행 중 앱 activation 실패 | launcher가 beep 1회, HUD 없음 |
 | 새 앱 open 실패 | launcher가 beep 1회, HUD 없음 |
+| Finder activation 또는 open 실패 | launcher가 beep 1회, HUD 없음 |
 | 현재 앱 없음 | 상태 변경 없음, beep 없음, HUD 없음 |
 | 앱 icon resolve 실패 | 기본 application icon으로 HUD 표시 |
 | keyboard-focus top-level window 화면 없음 | 마우스 화면으로 fallback |
@@ -327,9 +358,12 @@ Panel 또는 announcement 실패가 앱 실행이나 앱별 상태 mutation을 �
 2. 실행 중 앱 activation `false`가 beep를 정확히 한 번 낸 뒤 `.failed`를 반환한다.
 3. 새 앱 open completion이 error 없이 running application을 반환하면 `.launched`를 반환하고 beep를 내지 않는다.
 4. 새 앱 open completion의 error 또는 missing running application이 beep를 정확히 한 번 낸 뒤 `.failed`를 반환한다.
-5. 모든 completion이 main actor에서 정확히 한 번 전달된다.
-6. `.failed`를 받은 hotkey와 menu caller가 추가 beep를 내지 않는다.
-7. Manual shortcut이 outcome을 무시하고 HUD presenter를 호출하지 않는다.
+5. 실행 중 Finder activation 성공이 `.activated`를 반환하고 reopen event를 한 번 보낸다.
+6. Finder activation 실패가 reopen event 없이 beep를 정확히 한 번 내고 `.failed`를 반환한다.
+7. Finder open 성공은 `.launched`, URL 없음/error/missing running application은 beep 1회와 `.failed`를 반환한다.
+8. Dock과 Finder completion이 main actor에서 정확히 한 번 전달된다.
+9. `.failed`를 받은 hotkey와 menu caller가 추가 beep를 내지 않는다.
+10. Manual shortcut과 Finder menu action이 outcome을 무시하고 HUD presenter를 호출하지 않는다.
 
 ### 앱별 toggle 결과
 
@@ -349,10 +383,12 @@ Panel 또는 announcement 실패가 앱 실행이나 앱별 상태 mutation을 �
 6. `DockItem`을 한 번만 조회하고, 실행한 item의 application URL과 bundle identifier가 payload와 일치한다.
 7. Automatic Dock 앱 이름은 localized URL name, `DockItem.name`, bundle identifier 순으로 fallback한다.
 8. Active-app 이름은 `ActiveApplication.name`, bundle identifier 순으로 fallback한다.
-9. 종료된 앱 A 후 B를 호출해 B completion이 먼저 오고 A completion이 나중에 와도 B payload만 presenter와 announcement에 전달된다.
-10. 최신 B 입력이 실패하면 이전 A의 늦은 성공 completion도 HUD를 표시하지 않는다.
-11. Manual, Finder, Window Management callback은 presenter를 호출하지 않는다.
-12. menu action은 presenter를 호출하지 않는다.
+9. Finder hotkey 성공은 입력 전 capture한 display에 canonical Finder payload를 전달한다.
+10. Finder hotkey 실패는 model beep나 presenter 호출을 추가하지 않는다.
+11. Dock과 Finder completion이 역순으로 도착해도 최신 HUD 대상 입력의 payload만 전달된다.
+12. 최신 Finder 또는 Dock 입력이 실패하면 이전 요청의 늦은 성공 completion도 HUD를 표시하지 않는다.
+13. Manual 및 Window Management callback은 presenter를 호출하지 않는다.
+14. Dock/Finder/앱별 toggle menu action은 presenter를 호출하지 않는다.
 
 ### 화면 선택
 
@@ -366,11 +402,12 @@ Panel 또는 announcement 실패가 앱 실행이나 앱별 상태 mutation을 �
 
 ### Presentation mapping
 
-1. `AppLaunchOutcome`, `ActiveApplicationToggleOutcome`, `ShortcutHUDAction`, payload와 pure presentation mapping이 `Equatable`이다.
-2. Action별 badge symbol과 semantic role/color가 badge 없음, 빨간 `−`, 초록 `✓`로 매핑된다.
-3. Action별 English accessibility announcement가 올바르다.
-4. Reduce Motion 입력에서 scale animation이 disabled로 매핑된다.
-5. Reduce Transparency 입력에서 opaque background fallback이 enabled로 매핑된다.
+1. `AppLaunchOutcome`, `ActiveApplicationToggleOutcome`, `ShortcutHUDAction`, application metadata, payload와 pure presentation mapping이 `Equatable`이다.
+2. Dock metadata 이름 fallback과 canonical Finder metadata가 올바르다.
+3. Action별 badge symbol과 semantic role/color가 badge 없음, 빨간 `−`, 초록 `✓`로 매핑된다.
+4. Finder를 포함한 action별 English accessibility announcement가 올바르다.
+5. Reduce Motion과 Reduce Transparency 네 조합이 scale animation 및 opaque background 정책에 독립적으로 매핑된다.
+6. Glass outer border width와 inner highlight geometry가 승인된 card layout 값으로 유지된다.
 
 ### Presenter
 
@@ -381,15 +418,17 @@ Panel 또는 announcement 실패가 앱 실행이나 앱별 상태 mutation을 �
 5. 하나의 panel instance를 재사용하고 `orderOut`으로 숨긴다.
 6. 보이는 card가 132×132pt이며 card 중심이 선택된 display frame 중앙에 맞고 shadow가 panel bounds에서 잘리지 않는다.
 7. Icon은 application URL, bundle identifier, 기본 application icon 순으로 resolve한다.
-8. Fade-in 중 새 요청은 현재 progress를 유지하고, fade-out 중 새 요청은 opacity와 scale을 1.0으로 복원한다.
-9. Capturing scheduler로 마지막 요청 후 0.80초±0.05초에 panel이 숨겨지는지 확인한다.
-10. Request generation이 오래된 fade-out, hide, announcement callback의 state 변경을 막는다.
-11. 빠른 A→B 요청은 0.10초 debounce 후 B만 정확히 한 번 announce하고 A는 announce하지 않는다.
-12. Panel 표시가 실패해도 성공 action의 accessibility announcement를 시도한다.
-13. `display == nil`이면 panel을 표시하지 않고 accessibility announcement만 시도한다.
-14. Announcement 실패가 시각 HUD나 원래 action 결과를 변경하지 않는다.
+8. Entry 중 새 요청은 현재 progress를 유지하고, fade-out 중 새 요청은 opacity와 scale을 1.0으로 복원한다.
+9. 일반 모션은 fade 1.56초, hide 1.65초를 예약하고 Reduce Motion은 fade 1.30초, hide 1.39초를 예약한다.
+10. Fade callback은 opacity만 변경하고 scale 1.0을 유지한다.
+11. Request generation이 오래된 fade-out, hide, announcement callback의 state 변경을 막는다.
+12. 빠른 A→B 요청은 0.10초 debounce 후 B만 정확히 한 번 announce하고 A는 announce하지 않는다.
+13. Announcement callback은 visual phase를 변경하지 않는다.
+14. Panel 표시가 실패해도 성공 action의 accessibility announcement를 시도한다.
+15. `display == nil`이면 panel을 표시하지 않고 accessibility announcement만 시도한다.
+16. Announcement 실패가 시각 HUD나 원래 action 결과를 변경하지 않는다.
 
-Material, shadow, 실제 fade/scale의 시각 품질과 타사 전체 화면 앱 위 표시 여부는 수동 검증한다. 이번 기능을 위해 snapshot 또는 SwiftUI view-inspection dependency를 추가하지 않는다.
+Glass border, material, shadow, 실제 spring/fade의 시각 품질과 타사 전체 화면 앱 위 표시 여부는 수동 검증한다. 이번 기능을 위해 snapshot 또는 SwiftUI view-inspection dependency를 추가하지 않는다.
 
 ### 회귀 검증
 
@@ -401,22 +440,23 @@ make dev-build CODESIGN_IDENTITY=-
 개발 앱에서 다음을 수동 검증한다.
 
 1. Automatic Dock 단축키로 실행 중 앱과 종료된 앱을 각각 호출한다.
-2. Keyboard focus를 가진 최상위 window가 서로 다른 여러 모니터에 있을 때 HUD 위치를 확인한다.
-3. 현재 앱 토글 단축키로 Disable과 Enable badge를 확인한다.
-4. Manual, Finder, Window Management 및 menu action에 HUD가 나타나지 않는지 확인한다.
-5. HUD 표시 중 키보드 focus와 target app activation이 유지되는지 확인한다.
-6. 단축키를 빠르게 연속 입력해 HUD 교체와 dismiss timing을 확인한다.
-7. Reduce Motion과 Reduce Transparency 설정에서 fallback 표현을 확인한다.
-8. 전체 화면 앱 위에서 HUD가 표시되는지 확인한다.
-9. 실제 material, shadow, fade/scale 품질과 shadow clipping이 없는지 확인한다.
-10. VoiceOver에서 English announcement가 보이는 HUD와 동일한 마지막 action을 설명하는지 확인한다.
+2. Finder global shortcut으로 실행 중 Finder를 활성화해 Finder icon HUD와 reopen 동작을 확인한다.
+3. Keyboard focus를 가진 최상위 window가 서로 다른 여러 모니터에 있을 때 HUD 위치를 확인한다.
+4. 현재 앱 토글 단축키로 Disable과 Enable badge를 확인한다.
+5. Manual, Window Management, Dock/Finder/menu action에 HUD가 나타나지 않는지 확인한다.
+6. HUD 표시 중 키보드 focus와 target app activation이 유지되는지 확인한다.
+7. Finder와 Dock 단축키를 빠르게 연속 입력해 최신 HUD 교체와 dismiss timing을 확인한다.
+8. 기본 모션이 빠르게 나타나 한 번만 작게 반동하고, 약 1.20초 선명하게 유지된 뒤 scale/blur 없이 빠르게 fade되는지 확인한다.
+9. Reduce Motion과 Reduce Transparency 설정에서 fallback 표현을 확인한다.
+10. 전체 화면 앱 위에서 HUD가 표시되는지 확인한다.
+11. 실제 glass border, material, shadow, spring/fade 품질과 shadow clipping이 없는지 확인한다.
+12. VoiceOver에서 English announcement가 보이는 HUD와 동일한 마지막 action을 설명하는지 확인한다.
 
 ## 구현 순서
 
-1. `Equatable` outcome과 payload 타입, async launcher completion 및 beep 테스트를 작성한다.
-2. `AppLaunching`의 async 결과 계약과 snapshot-driven canonical toggle mutation을 구현한다.
-3. Permission prompt 없는 screen resolver와 immutable `DisplayFrame` fallback 테스트를 작성한다.
-4. Dock/menu API split, hotkey 전용 wrapper, model request generation과 stale completion 통합 테스트를 작성한다.
-5. Pure presentation mapping, scheduler generation, panel lifecycle과 placement 테스트를 작성한다.
-6. SwiftUI HUD view, icon fallback, badge와 English accessibility announcement를 구현한다.
-7. 전체 자동 테스트와 개발 앱 수동 검증을 수행한다.
+1. `ShortcutHUDApplication` metadata와 Finder presentation mapping을 TDD로 추가한다.
+2. Finder activation/launch를 `AppLaunchOutcome` completion과 exactly-once beep 계약으로 전환한다.
+3. Finder hotkey 전용 wrapper, menu split, shared generation과 stale completion 통합 테스트를 작성한다.
+4. C-style spring timing, opacity-only exit, Reduce Motion lifecycle을 presenter에 적용한다.
+5. 고정 glass outer border와 inner highlight를 HUD view에 적용한다.
+6. 전체 자동 테스트, 개발 빌드, Finder/Dock 실제 hotkey와 접근성 수동 검증을 수행한다.

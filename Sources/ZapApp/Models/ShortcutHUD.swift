@@ -8,6 +8,45 @@ enum ShortcutHUDAction: Equatable {
     case appHotKeysEnabled
 }
 
+struct ShortcutHUDApplication: Equatable {
+    let name: String
+    let bundleIdentifier: String?
+    let applicationURL: URL?
+
+    init(
+        name: String,
+        bundleIdentifier: String?,
+        applicationURL: URL?
+    ) {
+        self.name = name
+        self.bundleIdentifier = bundleIdentifier
+        self.applicationURL = applicationURL
+    }
+
+    init(
+        item: DockItem,
+        localizedDisplayName: (URL) -> String?
+    ) {
+        let candidates: [String?] = [
+            localizedDisplayName(item.url),
+            item.name,
+            item.bundleIdentifier,
+            item.url.deletingPathExtension().lastPathComponent
+        ]
+        name = candidates
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty }) ?? "Application"
+        bundleIdentifier = item.bundleIdentifier
+        applicationURL = item.url
+    }
+
+    static let finder = ShortcutHUDApplication(
+        name: "Finder",
+        bundleIdentifier: "com.apple.finder",
+        applicationURL: nil
+    )
+}
+
 struct ShortcutHUDPayload: Equatable {
     let action: ShortcutHUDAction
     let appName: String
@@ -15,23 +54,13 @@ struct ShortcutHUDPayload: Equatable {
     let applicationURL: URL?
 
     static func appActivated(
-        item: DockItem,
-        localizedDisplayName: (URL) -> String?
+        application: ShortcutHUDApplication
     ) -> ShortcutHUDPayload {
-        let candidates: [String?] = [
-            localizedDisplayName(item.url),
-            item.name,
-            item.bundleIdentifier,
-            item.url.deletingPathExtension().lastPathComponent
-        ]
-        let appName = candidates
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .first(where: { !$0.isEmpty }) ?? "Application"
-        return ShortcutHUDPayload(
+        ShortcutHUDPayload(
             action: .appActivated,
-            appName: appName,
-            bundleIdentifier: item.bundleIdentifier,
-            applicationURL: item.url
+            appName: application.name,
+            bundleIdentifier: application.bundleIdentifier,
+            applicationURL: application.applicationURL
         )
     }
 
@@ -98,6 +127,9 @@ enum ShortcutHUDLayout {
     static let cardSize = CGSize(width: 132, height: 132)
     static let iconSize = CGSize(width: 76, height: 76)
     static let cornerRadius: CGFloat = 32
+    static let glassBorderWidth: CGFloat = 1.5
+    static let innerHighlightInset: CGFloat = 4
+    static let innerHighlightCornerRadius: CGFloat = 28
     static let shadowInset: CGFloat = 20
 
     static var panelSize: CGSize {

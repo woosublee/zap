@@ -51,6 +51,41 @@ struct ShortcutHUDView: View {
             width: ShortcutHUDLayout.cardSize.width,
             height: ShortcutHUDLayout.cardSize.height
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: ShortcutHUDLayout.cornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(0.72), location: 0),
+                        .init(color: .white.opacity(0.14), location: 0.32),
+                        .init(
+                            color: Color(nsColor: .systemBlue).opacity(0.18),
+                            location: 0.68
+                        ),
+                        .init(color: .white.opacity(0.34), location: 1)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: ShortcutHUDLayout.glassBorderWidth
+            )
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: ShortcutHUDLayout.innerHighlightCornerRadius,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(
+                    presentation.usesOpaqueBackground ? 0.10 : 0.07
+                ),
+                lineWidth: 1
+            )
+            .padding(ShortcutHUDLayout.innerHighlightInset)
+        }
         .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
     }
 

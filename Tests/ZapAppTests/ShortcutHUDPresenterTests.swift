@@ -111,18 +111,60 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
 
         XCTAssertEqual(announcement.scheduledIntervals, [0.10])
-        XCTAssertEqual(fade.scheduledIntervals, [0.65])
-        XCTAssertEqual(hide.scheduledIntervals, [0.80])
+        XCTAssertEqual(fade.scheduledIntervals, [1.56])
+        XCTAssertEqual(hide.scheduledIntervals, [1.65])
+        XCTAssertEqual(presenter.phase, .visible)
         XCTAssertEqual(presenter.panel.frame.midX, display.frame.midX, accuracy: 0.001)
         XCTAssertEqual(presenter.panel.frame.midY, display.frame.midY, accuracy: 0.001)
 
         announcement.fireLatest()
         XCTAssertEqual(announcer.messages, ["Safari activated"])
+        XCTAssertEqual(presenter.phase, .visible)
         fade.fireLatest()
         XCTAssertEqual(presenter.phase, .fadingOut)
+        XCTAssertEqual(presenter.viewModel.opacity, 0)
+        XCTAssertEqual(presenter.viewModel.scale, 1)
         hide.fireLatest()
         XCTAssertEqual(presenter.phase, .hidden)
         XCTAssertFalse(presenter.panel.isVisible)
+    }
+
+    func testMotionTimingDefinesQuickSpringStableHoldAndFastExit() {
+        XCTAssertEqual(ShortcutHUDTiming.initialScale, 0.86)
+        XCTAssertEqual(ShortcutHUDTiming.springResponse, 0.24)
+        XCTAssertEqual(ShortcutHUDTiming.springDampingFraction, 0.72)
+        XCTAssertEqual(ShortcutHUDTiming.springSettlingDuration, 0.36)
+        XCTAssertEqual(ShortcutHUDTiming.stableHoldDuration, 1.20)
+        XCTAssertEqual(ShortcutHUDTiming.fadeOutDuration, 0.09)
+        XCTAssertEqual(
+            ShortcutHUDTiming.fadeDelay(usesScaleAnimation: true),
+            1.56
+        )
+        XCTAssertEqual(
+            ShortcutHUDTiming.hideDelay(usesScaleAnimation: true),
+            1.65
+        )
+    }
+
+    func testReducedMotionUsesOpacityEntryBeforeStableHold() {
+        let fade = CapturingShortcutHUDScheduler()
+        let hide = CapturingShortcutHUDScheduler()
+        let presenter = makePresenter(
+            fadeScheduler: fade,
+            hideScheduler: hide,
+            reduceMotion: { true }
+        )
+        let display = DisplayFrame(
+            frame: CGRect(x: 0, y: 0, width: 1000, height: 800),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1000, height: 775),
+            isMain: true
+        )
+
+        presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
+
+        XCTAssertEqual(fade.scheduledIntervals, [1.30])
+        XCTAssertEqual(hide.scheduledIntervals, [1.39])
+        XCTAssertEqual(presenter.viewModel.scale, 1)
     }
 
     func testRapidReplacementAnnouncesOnlyLatestPayload() {
@@ -165,7 +207,7 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         hide.fire(at: 0)
 
         XCTAssertTrue(announcer.messages.isEmpty)
-        XCTAssertEqual(presenter.phase, .appearing)
+        XCTAssertEqual(presenter.phase, .visible)
         XCTAssertTrue(presenter.panel.isVisible)
 
         announcement.fire(at: 1)
