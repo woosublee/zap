@@ -98,7 +98,7 @@ struct MenuBarView: View {
             ForEach(NumberKey.allCases) { key in
                 if let item = model.dockItem(for: key) {
                     Button(menuLabel(item.name, shortcut: model.shortcutTitle(for: key))) {
-                        model.activateDockItem(for: key)
+                        model.activateDockItemFromMenu(for: key)
                     }
                 }
             }

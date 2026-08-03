@@ -60,7 +60,8 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(source.contains("model.activateManualShortcut(id: shortcut.id)"))
         XCTAssertTrue(source.contains("NumberKey.allCases"))
         XCTAssertTrue(source.contains("if let item = model.dockItem(for: key)"))
-        XCTAssertTrue(source.contains("model.activateDockItem(for: key)"))
+        XCTAssertTrue(source.contains("model.activateDockItemFromMenu(for: key)"))
+        XCTAssertFalse(source.contains("model.handleDockHotKey(key)"))
         XCTAssertFalse(source.contains("Dock slot \\(key.rawValue)"))
     }
 

@@ -107,6 +107,11 @@ final class ZapAppModel: ObservableObject {
     private let activeApplicationProvider: () -> ActiveApplication?
     private let workspaceNotificationCenter: NotificationCenter
     private let pauseScheduler: any HotKeyPauseScheduling
+    private let shortcutHUDPresenter: any ShortcutHUDPresenting
+    private let shortcutHUDScreenResolver: any ShortcutHUDScreenResolving
+    private let shortcutHUDLocalizedDisplayName: (URL) -> String?
+    private let beep: () -> Void
+    private var shortcutHUDRequestGeneration = 0
     private let hotKeyServiceFactory: (
         @escaping (NumberKey) -> Void,
         @escaping () -> Void,
@@ -117,7 +122,7 @@ final class ZapAppModel: ObservableObject {
     private lazy var hotKeyService: any GlobalHotKeyServicing = hotKeyServiceFactory(
         { [weak self] key in
             Task { @MainActor [weak self] in
-                self?.activateDockItem(for: key)
+                self?.handleDockHotKey(key)
             }
         },
         { [weak self] in
@@ -137,7 +142,7 @@ final class ZapAppModel: ObservableObject {
         },
         { [weak self] in
             Task { @MainActor [weak self] in
-                self?.toggleHotKeysForActiveApplication()
+                self?.handleActiveApplicationToggleHotKey()
             }
         }
     )
@@ -153,6 +158,13 @@ final class ZapAppModel: ObservableObject {
         activeApplicationProvider: @escaping () -> ActiveApplication? = { ActiveApplication.current },
         workspaceNotificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter,
         pauseScheduler: any HotKeyPauseScheduling = TimerHotKeyPauseScheduler(),
+        shortcutHUDPresenter: (any ShortcutHUDPresenting)? = nil,
+        shortcutHUDScreenResolver: (any ShortcutHUDScreenResolving)? = nil,
+        shortcutHUDLocalizedDisplayName: @escaping (URL) -> String? = {
+            let name = FileManager.default.displayName(atPath: $0.path)
+            return name.isEmpty ? nil : name
+        },
+        beep: @escaping () -> Void = { NSSound.beep() },
         hotKeyServiceFactory: @escaping (
             @escaping (NumberKey) -> Void,
             @escaping () -> Void,
@@ -185,6 +197,10 @@ final class ZapAppModel: ObservableObject {
         self.activeApplicationProvider = activeApplicationProvider
         self.workspaceNotificationCenter = workspaceNotificationCenter
         self.pauseScheduler = pauseScheduler
+        self.shortcutHUDPresenter = shortcutHUDPresenter ?? NoOpShortcutHUDPresenter()
+        self.shortcutHUDScreenResolver = shortcutHUDScreenResolver ?? ShortcutHUDScreenResolver()
+        self.shortcutHUDLocalizedDisplayName = shortcutHUDLocalizedDisplayName
+        self.beep = beep
         self.hotKeyServiceFactory = hotKeyServiceFactory
         self.manualShortcuts = Self.loadManualShortcuts()
         self.isFinderShortcutEnabled = UserDefaults.standard.bool(forKey: Self.finderShortcutEnabledKey)
@@ -296,6 +312,31 @@ final class ZapAppModel: ObservableObject {
         toggleHotKeys(for: activeApplicationProvider())
     }
 
+    func handleActiveApplicationToggleHotKey() {
+        let generation = beginShortcutHUDRequest()
+        let display = shortcutHUDScreenResolver.resolveScreenBeforeAction()
+        let application = activeApplicationProvider()
+        let outcome = toggleHotKeys(for: application)
+        guard generation == shortcutHUDRequestGeneration else { return }
+
+        let payload: ShortcutHUDPayload
+        switch outcome {
+        case let .disabled(application):
+            payload = .appHotKeys(
+                action: .appHotKeysDisabled,
+                application: application
+            )
+        case let .enabled(application):
+            payload = .appHotKeys(
+                action: .appHotKeysEnabled,
+                application: application
+            )
+        case .noActiveApplication:
+            return
+        }
+        shortcutHUDPresenter.present(payload, on: display)
+    }
+
     func refreshDockItems() {
         dockItems = dockItemProvider.currentDockItems()
     }
@@ -351,13 +392,46 @@ final class ZapAppModel: ObservableObject {
         ShortcutKeyDisplay.displayName(forKeyCode: 50)
     }
 
-    func activateDockItem(for key: NumberKey) {
+    func resolveDockItem(for key: NumberKey) -> DockItem? {
         refreshDockItems()
-        guard let item = dockItem(for: key) else {
-            NSSound.beep()
+        return dockItem(for: key)
+    }
+
+    func activateDockItem(
+        _ item: DockItem,
+        completion: @escaping (AppLaunchOutcome) -> Void
+    ) {
+        appLauncher.activateOrLaunch(item, completion: completion)
+    }
+
+    func activateDockItemFromMenu(for key: NumberKey) {
+        guard let item = resolveDockItem(for: key) else {
+            beep()
             return
         }
-        appLauncher.activateOrLaunch(item) { _ in }
+        activateDockItem(item) { _ in }
+    }
+
+    func handleDockHotKey(_ key: NumberKey) {
+        let generation = beginShortcutHUDRequest()
+        let display = shortcutHUDScreenResolver.resolveScreenBeforeAction()
+        guard let item = resolveDockItem(for: key) else {
+            beep()
+            return
+        }
+
+        activateDockItem(item) { [weak self] outcome in
+            guard let self,
+                  generation == self.shortcutHUDRequestGeneration,
+                  outcome == .activated || outcome == .launched else {
+                return
+            }
+            let payload = ShortcutHUDPayload.appActivated(
+                item: item,
+                localizedDisplayName: self.shortcutHUDLocalizedDisplayName
+            )
+            self.shortcutHUDPresenter.present(payload, on: display)
+        }
     }
 
     func activateFinder() {
@@ -403,11 +477,16 @@ final class ZapAppModel: ObservableObject {
             NSSound.beep()
             return
         }
-        appLauncher.activateOrLaunch(shortcut.dockItem) { _ in }
+        activateDockItem(shortcut.dockItem) { _ in }
     }
 
     var activeManualShortcuts: [ManualShortcut] {
         manualShortcuts.filter(\.canRegister)
+    }
+
+    private func beginShortcutHUDRequest() -> Int {
+        shortcutHUDRequestGeneration += 1
+        return shortcutHUDRequestGeneration
     }
 
     private func registerHotKeys() {

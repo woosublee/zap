@@ -230,17 +230,20 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
             shortcutStore: InMemoryWindowShortcutStore(shortcuts: [windowShortcut(.leftHalf, keyCode: 123, modifiers: [.option, .command])])
         )
         let hotKeyService = CapturingHotKeyService()
+        let presenter = CapturingShortcutHUDPresenter()
 
         let model = makeModel(
             dockItems: [dockItem],
             appLauncher: launcher,
             windowManagementModel: windowModel,
-            hotKeyService: hotKeyService
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter
         )
 
         hotKeyService.onDockHotKey?(.one)
         await Task.yield()
         XCTAssertEqual(launcher.activatedItems, [dockItem])
+        let presentationCountAfterDock = presenter.presentations.count
 
         hotKeyService.onFinderHotKey?()
         await Task.yield()
@@ -255,6 +258,156 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(windowPerformer.performedActions, [.leftHalf])
         XCTAssertEqual(launcher.activatedItems, [dockItem, manual.dockItem])
         XCTAssertEqual(launcher.activateFinderCallCount, 1)
+        XCTAssertEqual(presenter.presentations.count, presentationCountAfterDock)
+        _ = model
+    }
+
+    func testAutomaticDockHotKeyPresentsActivatedPayloadOnCapturedDisplay() async {
+        let item = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let display = DisplayFrame(
+            frame: CGRect(x: 1000, y: 0, width: 1000, height: 800),
+            visibleFrame: CGRect(x: 1000, y: 25, width: 1000, height: 775),
+            isMain: false
+        )
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [item],
+            appLauncher: CapturingAppLauncher(),
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter,
+            shortcutHUDScreenResolver: StubShortcutHUDScreenResolver(display: display),
+            shortcutHUDLocalizedDisplayName: { _ in "Localized Terminal" }
+        )
+
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+
+        XCTAssertEqual(
+            presenter.presentations,
+            [.init(
+                payload: ShortcutHUDPayload(
+                    action: .appActivated,
+                    appName: "Localized Terminal",
+                    bundleIdentifier: item.bundleIdentifier,
+                    applicationURL: item.url
+                ),
+                display: display
+            )]
+        )
+        _ = model
+    }
+
+    func testAutomaticDockHotKeyResolvesDockItemsOnceForLaunchAndPayload() async {
+        let item = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let provider = CountingDockItemProvider(items: [item])
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItemProvider: provider,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter
+        )
+        let callsAfterInitialization = provider.currentDockItemsCallCount
+
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+
+        XCTAssertEqual(provider.currentDockItemsCallCount, callsAfterInitialization + 1)
+        XCTAssertEqual(presenter.presentations.first?.payload.applicationURL, item.url)
+        XCTAssertEqual(presenter.presentations.first?.payload.bundleIdentifier, item.bundleIdentifier)
+        _ = model
+    }
+
+    func testDockMenuLaunchNeverPresentsHUD() {
+        let item = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let presenter = CapturingShortcutHUDPresenter()
+        let model = makeModel(
+            dockItems: [item],
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            shortcutHUDPresenter: presenter
+        )
+
+        model.activateDockItemFromMenu(for: .one)
+
+        XCTAssertTrue(presenter.presentations.isEmpty)
+    }
+
+    func testMissingDockSlotBeepsOnceWithoutPresentingHUD() async {
+        var beepCount = 0
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [],
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter,
+            beep: { beepCount += 1 }
+        )
+
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+
+        XCTAssertEqual(beepCount, 1)
+        XCTAssertTrue(presenter.presentations.isEmpty)
+        _ = model
+    }
+
+    func testFailedDockOutcomeDoesNotPresentOrAddCallerBeep() async {
+        let item = DockItem(
+            name: "Terminal",
+            url: URL(fileURLWithPath: "/Applications/Terminal.app"),
+            bundleIdentifier: "com.apple.Terminal"
+        )
+        let launcher = CapturingAppLauncher()
+        launcher.nextOutcome = .failed
+        var callerBeepCount = 0
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [item],
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter,
+            beep: { callerBeepCount += 1 }
+        )
+
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+
+        XCTAssertEqual(callerBeepCount, 0)
+        XCTAssertTrue(presenter.presentations.isEmpty)
         _ = model
     }
 
@@ -414,6 +567,151 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         model.resumeHotKeys()
         XCTAssertEqual(hotKeyService.registrations.count, 2)
         XCTAssertFalse(model.areHotKeysPaused)
+    }
+
+    func testActiveApplicationToggleHotKeyPresentsDisableThenEnable() async {
+        let safari = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            activeApplicationProvider: { safari },
+            shortcutHUDPresenter: presenter
+        )
+
+        hotKeyService.onActiveApplicationToggleHotKey?()
+        await Task.yield()
+        hotKeyService.onActiveApplicationToggleHotKey?()
+        await Task.yield()
+
+        XCTAssertEqual(
+            presenter.presentations.map(\.payload.action),
+            [.appHotKeysDisabled, .appHotKeysEnabled]
+        )
+        XCTAssertTrue(presenter.presentations.allSatisfy {
+            $0.payload.appName == "Safari" &&
+            $0.payload.bundleIdentifier == "com.apple.Safari"
+        })
+        _ = model
+    }
+
+    func testMenuActiveApplicationToggleNeverPresentsHUD() {
+        let safari = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        let presenter = CapturingShortcutHUDPresenter()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            activeApplicationProvider: { safari },
+            shortcutHUDPresenter: presenter
+        )
+
+        XCTAssertEqual(model.toggleHotKeysForActiveApplication(), .disabled(safari))
+        XCTAssertTrue(presenter.presentations.isEmpty)
+    }
+
+    func testMissingActiveApplicationHotKeyDoesNotBeepOrPresentHUD() async {
+        var beepCount = 0
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            activeApplicationProvider: { nil },
+            shortcutHUDPresenter: presenter,
+            beep: { beepCount += 1 }
+        )
+
+        hotKeyService.onActiveApplicationToggleHotKey?()
+        await Task.yield()
+
+        XCTAssertEqual(beepCount, 0)
+        XCTAssertTrue(presenter.presentations.isEmpty)
+        _ = model
+    }
+
+    func testLateOlderDockCompletionCannotReplaceNewerHUDRequest() async {
+        let first = DockItem(
+            name: "First",
+            url: URL(fileURLWithPath: "/Applications/First.app"),
+            bundleIdentifier: "com.example.First"
+        )
+        let second = DockItem(
+            name: "Second",
+            url: URL(fileURLWithPath: "/Applications/Second.app"),
+            bundleIdentifier: "com.example.Second"
+        )
+        let launcher = CapturingAppLauncher()
+        launcher.defersCompletion = true
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [first, second],
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter,
+            shortcutHUDLocalizedDisplayName: { $0.deletingPathExtension().lastPathComponent }
+        )
+
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+        hotKeyService.onDockHotKey?(.two)
+        await Task.yield()
+        launcher.completeLaunch(at: 1, with: .launched)
+        launcher.completeLaunch(at: 0, with: .launched)
+
+        XCTAssertEqual(presenter.presentations.map(\.payload.appName), ["Second"])
+        _ = model
+    }
+
+    func testNewerFailedDockRequestSuppressesOlderLateSuccess() async {
+        let first = DockItem(
+            name: "First",
+            url: URL(fileURLWithPath: "/Applications/First.app"),
+            bundleIdentifier: "com.example.First"
+        )
+        let second = DockItem(
+            name: "Second",
+            url: URL(fileURLWithPath: "/Applications/Second.app"),
+            bundleIdentifier: "com.example.Second"
+        )
+        let launcher = CapturingAppLauncher()
+        launcher.defersCompletion = true
+        let presenter = CapturingShortcutHUDPresenter()
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            dockItems: [first, second],
+            appLauncher: launcher,
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: hotKeyService,
+            shortcutHUDPresenter: presenter
+        )
+
+        hotKeyService.onDockHotKey?(.one)
+        await Task.yield()
+        hotKeyService.onDockHotKey?(.two)
+        await Task.yield()
+        launcher.completeLaunch(at: 1, with: .failed)
+        launcher.completeLaunch(at: 0, with: .launched)
+
+        XCTAssertTrue(presenter.presentations.isEmpty)
+        _ = model
     }
 
     func testToggleHotKeysDisablesAndEnablesExactApplicationSnapshot() {
@@ -691,7 +989,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         )
 
         model.pauseHotKeysIndefinitely()
-        model.activateDockItem(for: .one)
+        model.activateDockItemFromMenu(for: .one)
         model.activateFinder()
         _ = model.windowManagementModel.perform(action: .leftHalf)
 
@@ -717,6 +1015,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
 
     private func makeModel(
         dockItems: [DockItem] = [],
+        dockItemProvider: (any DockItemProviding)? = nil,
         appLauncher: CapturingAppLauncher? = nil,
         windowManagementModel: WindowManagementModel,
         hotKeyService: CapturingHotKeyService,
@@ -724,10 +1023,14 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         now: @escaping () -> Date = Date.init,
         activeApplicationProvider: @escaping () -> ActiveApplication? = { nil },
         workspaceNotificationCenter: NotificationCenter = NotificationCenter(),
-        pauseScheduler: any HotKeyPauseScheduling = CapturingPauseScheduler()
+        pauseScheduler: any HotKeyPauseScheduling = CapturingPauseScheduler(),
+        shortcutHUDPresenter: (any ShortcutHUDPresenting)? = nil,
+        shortcutHUDScreenResolver: (any ShortcutHUDScreenResolving)? = nil,
+        shortcutHUDLocalizedDisplayName: @escaping (URL) -> String? = { _ in nil },
+        beep: @escaping () -> Void = {}
     ) -> ZapAppModel {
         ZapAppModel(
-            dockItemProvider: StubDockItemProvider(items: dockItems),
+            dockItemProvider: dockItemProvider ?? StubDockItemProvider(items: dockItems),
             appLauncher: appLauncher ?? CapturingAppLauncher(),
             loginItemService: StubLoginItemService(),
             updateService: UpdateService(driverFactory: { StubUpdateDriver() }, buildTagProvider: { nil }),
@@ -737,6 +1040,11 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
             activeApplicationProvider: activeApplicationProvider,
             workspaceNotificationCenter: workspaceNotificationCenter,
             pauseScheduler: pauseScheduler,
+            shortcutHUDPresenter: shortcutHUDPresenter ?? NoOpShortcutHUDPresenter(),
+            shortcutHUDScreenResolver: shortcutHUDScreenResolver ??
+                StubShortcutHUDScreenResolver(display: nil),
+            shortcutHUDLocalizedDisplayName: shortcutHUDLocalizedDisplayName,
+            beep: beep,
             hotKeyServiceFactory: {
                 onDockHotKey,
                 onFinderHotKey,
@@ -924,10 +1232,54 @@ private struct StubDockItemProvider: DockItemProviding {
     }
 }
 
+private final class CountingDockItemProvider: DockItemProviding {
+    let items: [DockItem]
+    private(set) var currentDockItemsCallCount = 0
+
+    init(items: [DockItem]) {
+        self.items = items
+    }
+
+    func currentDockItems() -> [DockItem] {
+        currentDockItemsCallCount += 1
+        return items
+    }
+}
+
+@MainActor
+private final class CapturingShortcutHUDPresenter: ShortcutHUDPresenting {
+    struct Presentation: Equatable {
+        let payload: ShortcutHUDPayload
+        let display: DisplayFrame?
+    }
+
+    var presentations: [Presentation] = []
+
+    func present(_ payload: ShortcutHUDPayload, on display: DisplayFrame?) {
+        presentations.append(Presentation(payload: payload, display: display))
+    }
+}
+
+@MainActor
+private struct StubShortcutHUDScreenResolver: ShortcutHUDScreenResolving {
+    let display: DisplayFrame?
+
+    func resolveScreenBeforeAction() -> DisplayFrame? {
+        display
+    }
+}
+
 private final class CapturingAppLauncher: AppLaunching {
+    struct PendingLaunch {
+        let item: DockItem
+        let completion: (AppLaunchOutcome) -> Void
+    }
+
     var activatedItems: [DockItem] = []
     var activateFinderCallCount = 0
     var nextOutcome: AppLaunchOutcome = .activated
+    var defersCompletion = false
+    var pendingLaunches: [PendingLaunch] = []
     var onActivateOrLaunch: (() -> Void)?
     var onActivateFinder: (() -> Void)?
 
@@ -937,7 +1289,15 @@ private final class CapturingAppLauncher: AppLaunching {
     ) {
         activatedItems.append(item)
         onActivateOrLaunch?()
-        completion(nextOutcome)
+        if defersCompletion {
+            pendingLaunches.append(PendingLaunch(item: item, completion: completion))
+        } else {
+            completion(nextOutcome)
+        }
+    }
+
+    func completeLaunch(at index: Int, with outcome: AppLaunchOutcome) {
+        pendingLaunches[index].completion(outcome)
     }
 
     func activateFinder() {
