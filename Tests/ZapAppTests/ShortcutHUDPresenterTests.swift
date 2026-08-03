@@ -218,6 +218,22 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         XCTAssertEqual(presenter.phase, .visible)
     }
 
+    func testPresenterDefersHostingViewInstallationUntilFirstVisualPresentation() {
+        let presenter = makePresenter()
+        let display = DisplayFrame(
+            frame: CGRect(x: 0, y: 0, width: 1000, height: 800),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1000, height: 775),
+            isMain: true
+        )
+
+        XCTAssertNil(presenter.panel.contentViewController)
+
+        presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
+
+        XCTAssertNotNil(presenter.panel.contentViewController)
+        XCTAssertEqual(presenter.panel.frame.size, ShortcutHUDLayout.panelSize)
+    }
+
     func testPanelFrameIncludesShadowInsetAroundCenteredCard() {
         let presenter = makePresenter()
 

@@ -171,12 +171,7 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
         self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
 
-        let panel = panel ?? Self.makePanel()
-        self.panel = panel
-        panel.contentViewController = NSHostingController(
-            rootView: ShortcutHUDView(model: viewModel)
-        )
-        panel.setContentSize(ShortcutHUDLayout.panelSize)
+        self.panel = panel ?? Self.makePanel()
     }
 
     static func makePanel() -> ShortcutHUDPanel {
@@ -218,6 +213,7 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
         viewModel.presentation = presentation
 
         if let display {
+            installContentViewIfNeeded()
             panel.setFrame(ShortcutHUDLayout.panelFrame(on: display), display: false)
             do {
                 try showOrRefreshPanel(presentation: presentation)
@@ -238,6 +234,14 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
             }
             try? self.announcer.announce(presentation.announcement)
         }
+    }
+
+    private func installContentViewIfNeeded() {
+        guard panel.contentViewController == nil else { return }
+        panel.contentViewController = NSHostingController(
+            rootView: ShortcutHUDView(model: viewModel)
+        )
+        panel.setContentSize(ShortcutHUDLayout.panelSize)
     }
 
     private func showOrRefreshPanel(
