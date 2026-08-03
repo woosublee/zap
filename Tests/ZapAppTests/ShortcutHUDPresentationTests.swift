@@ -144,7 +144,7 @@ final class ShortcutHUDPresentationTests: XCTestCase {
         }
     }
 
-    func testLayoutCentersCardOnDisplayAndLeavesShadowInset() {
+    func testLayoutCentersCardOnDisplayAndLeavesMotionInset() {
         let display = DisplayFrame(
             frame: CGRect(x: 1440, y: 0, width: 1920, height: 1080),
             visibleFrame: CGRect(x: 1440, y: 25, width: 1920, height: 1055),
@@ -158,8 +158,15 @@ final class ShortcutHUDPresentationTests: XCTestCase {
         XCTAssertEqual(ShortcutHUDLayout.glassBorderWidth, 1.5)
         XCTAssertEqual(ShortcutHUDLayout.innerHighlightInset, 4)
         XCTAssertEqual(ShortcutHUDLayout.innerHighlightCornerRadius, 28)
-        XCTAssertGreaterThan(panelFrame.width, ShortcutHUDLayout.cardSize.width)
-        XCTAssertGreaterThan(panelFrame.height, ShortcutHUDLayout.cardSize.height)
+        XCTAssertGreaterThan(ShortcutHUDLayout.motionInset, 0)
+        XCTAssertEqual(
+            panelFrame.width,
+            ShortcutHUDLayout.cardSize.width + ShortcutHUDLayout.motionInset * 2
+        )
+        XCTAssertEqual(
+            panelFrame.height,
+            ShortcutHUDLayout.cardSize.height + ShortcutHUDLayout.motionInset * 2
+        )
         XCTAssertEqual(panelFrame.midX, display.frame.midX, accuracy: 0.001)
         XCTAssertEqual(panelFrame.midY, display.frame.midY, accuracy: 0.001)
     }

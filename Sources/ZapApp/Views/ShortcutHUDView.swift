@@ -1,6 +1,40 @@
 import AppKit
 import SwiftUI
 
+final class ShortcutHUDMaterialView: NSVisualEffectView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configure()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configure()
+    }
+
+    func configure() {
+        material = .hudWindow
+        blendingMode = .behindWindow
+        state = .active
+        alphaValue = 0.72
+        isEmphasized = false
+        wantsLayer = true
+        layer?.cornerRadius = ShortcutHUDLayout.cornerRadius
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+    }
+}
+
+struct ShortcutHUDMaterialBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> ShortcutHUDMaterialView {
+        ShortcutHUDMaterialView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: ShortcutHUDMaterialView, context: Context) {
+        nsView.configure()
+    }
+}
+
 struct ShortcutHUDView: View {
     @ObservedObject var model: ShortcutHUDViewModel
 
@@ -25,15 +59,19 @@ struct ShortcutHUDView: View {
         icon: NSImage
     ) -> some View {
         ZStack {
-            RoundedRectangle(
-                cornerRadius: ShortcutHUDLayout.cornerRadius,
-                style: .continuous
-            )
-            .fill(
-                presentation.usesOpaqueBackground
-                    ? AnyShapeStyle(Color.black.opacity(0.90))
-                    : AnyShapeStyle(.ultraThinMaterial)
-            )
+            if presentation.usesOpaqueBackground {
+                RoundedRectangle(
+                    cornerRadius: ShortcutHUDLayout.cornerRadius,
+                    style: .continuous
+                )
+                .fill(Color.black.opacity(0.90))
+            } else {
+                ShortcutHUDMaterialBackground()
+                    .frame(
+                        width: ShortcutHUDLayout.cardSize.width,
+                        height: ShortcutHUDLayout.cardSize.height
+                    )
+            }
 
             Image(nsImage: icon)
                 .resizable()
@@ -86,7 +124,6 @@ struct ShortcutHUDView: View {
             )
             .padding(ShortcutHUDLayout.innerHighlightInset)
         }
-        .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
     }
 
     @ViewBuilder

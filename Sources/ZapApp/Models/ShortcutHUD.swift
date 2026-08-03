@@ -130,12 +130,12 @@ enum ShortcutHUDLayout {
     static let glassBorderWidth: CGFloat = 1.5
     static let innerHighlightInset: CGFloat = 4
     static let innerHighlightCornerRadius: CGFloat = 28
-    static let shadowInset: CGFloat = 20
+    static let motionInset: CGFloat = 20
 
     static var panelSize: CGSize {
         CGSize(
-            width: cardSize.width + shadowInset * 2,
-            height: cardSize.height + shadowInset * 2
+            width: cardSize.width + motionInset * 2,
+            height: cardSize.height + motionInset * 2
         )
     }
 
