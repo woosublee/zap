@@ -67,6 +67,20 @@ final class TimerShortcutHUDScheduler: ShortcutHUDScheduling {
 }
 
 @MainActor
+protocol ShortcutHUDEntryEnqueuing: AnyObject {
+    func enqueue(action: @escaping @MainActor () -> Void)
+}
+
+@MainActor
+final class MainQueueShortcutHUDEntryEnqueuer: ShortcutHUDEntryEnqueuing {
+    func enqueue(action: @escaping @MainActor () -> Void) {
+        DispatchQueue.main.async {
+            action()
+        }
+    }
+}
+
+@MainActor
 protocol ShortcutHUDIconResolving {
     func icon(for payload: ShortcutHUDPayload) -> NSImage
 }
@@ -143,24 +157,23 @@ class ShortcutHUDPanel: NSPanel {
 enum ShortcutHUDTiming {
     static let announcementDelay: TimeInterval = 0.10
     static let opacityEntryDuration: TimeInterval = 0.10
-    static let initialScale: CGFloat = 0.86
+    static let initialScale: CGFloat = 0.82
     static let springResponse: TimeInterval = 0.24
-    static let springDampingFraction: Double = 0.72
+    static let springDampingFraction: Double = 0.62
     static let springSettlingDuration: TimeInterval = 0.36
-    static let stableHoldDuration: TimeInterval = 1.20
+    static let stableHoldDuration: TimeInterval = 0.30
     static let fadeOutDuration: TimeInterval = 0.09
 
-    private static let springFadeDelay: TimeInterval = 1.56
-    private static let reducedMotionFadeDelay: TimeInterval = 1.30
-    private static let springHideDelay: TimeInterval = 1.65
-    private static let reducedMotionHideDelay: TimeInterval = 1.39
-
     static func fadeDelay(usesScaleAnimation: Bool) -> TimeInterval {
-        usesScaleAnimation ? springFadeDelay : reducedMotionFadeDelay
+        if usesScaleAnimation {
+            springSettlingDuration + stableHoldDuration
+        } else {
+            opacityEntryDuration + stableHoldDuration
+        }
     }
 
     static func hideDelay(usesScaleAnimation: Bool) -> TimeInterval {
-        usesScaleAnimation ? springHideDelay : reducedMotionHideDelay
+        fadeDelay(usesScaleAnimation: usesScaleAnimation) + fadeOutDuration
     }
 }
 
@@ -188,10 +201,13 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
     private let fadeScheduler: any ShortcutHUDScheduling
     private let hideScheduler: any ShortcutHUDScheduling
     private let announcementScheduler: any ShortcutHUDScheduling
+    private let entryEnqueuer: any ShortcutHUDEntryEnqueuing
     private let orderFront: @MainActor (ShortcutHUDPanel) throws -> Void
     private let reduceMotion: () -> Bool
     private let reduceTransparency: () -> Bool
-    private var generation = 0
+    private var requestGeneration = 0
+    private var lifecycleGeneration = 0
+    private var isEntryPending = false
 
     init(
         panel: ShortcutHUDPanel? = nil,
@@ -200,6 +216,7 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
         fadeScheduler: (any ShortcutHUDScheduling)? = nil,
         hideScheduler: (any ShortcutHUDScheduling)? = nil,
         announcementScheduler: (any ShortcutHUDScheduling)? = nil,
+        entryEnqueuer: (any ShortcutHUDEntryEnqueuing)? = nil,
         orderFront: @escaping @MainActor (ShortcutHUDPanel) throws -> Void = {
             $0.orderFrontRegardless()
         },
@@ -215,6 +232,7 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
         self.fadeScheduler = fadeScheduler ?? TimerShortcutHUDScheduler()
         self.hideScheduler = hideScheduler ?? TimerShortcutHUDScheduler()
         self.announcementScheduler = announcementScheduler ?? TimerShortcutHUDScheduler()
+        self.entryEnqueuer = entryEnqueuer ?? MainQueueShortcutHUDEntryEnqueuer()
         self.orderFront = orderFront
         self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
@@ -246,10 +264,8 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
     }
 
     func present(_ payload: ShortcutHUDPayload, on display: DisplayFrame?) {
-        generation += 1
-        let requestGeneration = generation
-        fadeScheduler.cancel()
-        hideScheduler.cancel()
+        requestGeneration += 1
+        let latestRequestGeneration = requestGeneration
         announcementScheduler.cancel()
 
         let presentation = ShortcutHUDPresentation(
@@ -265,15 +281,13 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
             panel.setFrame(ShortcutHUDLayout.panelFrame(on: display), display: false)
             do {
                 try showOrRefreshPanel(presentation: presentation)
-                scheduleFadeAndHide(
-                    generation: requestGeneration,
-                    presentation: presentation
-                )
             } catch {
+                invalidateVisualLifecycle()
                 panel.orderOut(nil)
                 phase = .hidden
             }
         } else {
+            invalidateVisualLifecycle()
             panel.orderOut(nil)
             phase = .hidden
         }
@@ -281,7 +295,10 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
         announcementScheduler.schedule(
             after: ShortcutHUDTiming.announcementDelay
         ) { [weak self] in
-            guard let self, requestGeneration == self.generation else { return }
+            guard let self,
+                  latestRequestGeneration == self.requestGeneration else {
+                return
+            }
             try? self.announcer.announce(presentation.announcement)
         }
     }
@@ -299,41 +316,94 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
     ) throws {
         switch phase {
         case .hidden:
+            try prepareEntry(presentation: presentation)
+        case .visible:
+            break
+        case .fadingOut:
+            reviveVisualLifecycle(presentation: presentation)
+        }
+    }
+
+    private func prepareEntry(
+        presentation: ShortcutHUDPresentation
+    ) throws {
+        invalidateVisualLifecycle()
+        let entryLifecycleGeneration = lifecycleGeneration
+        isEntryPending = true
+        withAnimation(nil) {
             viewModel.opacity = 0
             viewModel.scale = presentation.usesScaleAnimation
                 ? ShortcutHUDTiming.initialScale
                 : 1
-            try orderFront(panel)
-            phase = .visible
-            withAnimation(
-                .easeOut(duration: ShortcutHUDTiming.opacityEntryDuration)
-            ) {
-                viewModel.opacity = 1
+        }
+        try orderFront(panel)
+        panel.displayIfNeeded()
+        phase = .visible
+
+        entryEnqueuer.enqueue { [weak self] in
+            guard let self,
+                  entryLifecycleGeneration == self.lifecycleGeneration,
+                  self.phase == .visible,
+                  self.isEntryPending else {
+                return
             }
-            if presentation.usesScaleAnimation {
-                withAnimation(
-                    .spring(
-                        response: ShortcutHUDTiming.springResponse,
-                        dampingFraction: ShortcutHUDTiming.springDampingFraction,
-                        blendDuration: 0
-                    )
-                ) {
-                    viewModel.scale = 1
-                }
-            }
-        case .visible:
-            break
-        case .fadingOut:
-            withAnimation(nil) {
-                viewModel.opacity = 1
-                viewModel.scale = 1
-            }
-            phase = .visible
+            self.isEntryPending = false
+            self.startEntry(
+                presentation: presentation,
+                lifecycleGeneration: entryLifecycleGeneration
+            )
         }
     }
 
+    private func startEntry(
+        presentation: ShortcutHUDPresentation,
+        lifecycleGeneration: Int
+    ) {
+        withAnimation(
+            .easeOut(duration: ShortcutHUDTiming.opacityEntryDuration)
+        ) {
+            viewModel.opacity = 1
+        }
+        if presentation.usesScaleAnimation {
+            withAnimation(
+                .spring(
+                    response: ShortcutHUDTiming.springResponse,
+                    dampingFraction: ShortcutHUDTiming.springDampingFraction,
+                    blendDuration: 0
+                )
+            ) {
+                viewModel.scale = 1
+            }
+        }
+        scheduleFadeAndHide(
+            lifecycleGeneration: lifecycleGeneration,
+            presentation: presentation
+        )
+    }
+
+    private func reviveVisualLifecycle(presentation: ShortcutHUDPresentation) {
+        invalidateVisualLifecycle()
+        let revivedLifecycleGeneration = lifecycleGeneration
+        withAnimation(nil) {
+            viewModel.opacity = 1
+            viewModel.scale = 1
+        }
+        phase = .visible
+        scheduleFadeAndHide(
+            lifecycleGeneration: revivedLifecycleGeneration,
+            presentation: presentation
+        )
+    }
+
+    private func invalidateVisualLifecycle() {
+        lifecycleGeneration += 1
+        isEntryPending = false
+        fadeScheduler.cancel()
+        hideScheduler.cancel()
+    }
+
     private func scheduleFadeAndHide(
-        generation requestGeneration: Int,
+        lifecycleGeneration: Int,
         presentation: ShortcutHUDPresentation
     ) {
         fadeScheduler.schedule(
@@ -341,7 +411,10 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
                 usesScaleAnimation: presentation.usesScaleAnimation
             )
         ) { [weak self] in
-            guard let self, requestGeneration == self.generation else { return }
+            guard let self,
+                  lifecycleGeneration == self.lifecycleGeneration else {
+                return
+            }
             self.phase = .fadingOut
             withAnimation(
                 .easeOut(duration: ShortcutHUDTiming.fadeOutDuration)
@@ -354,9 +427,13 @@ final class ShortcutHUDPresenter: ShortcutHUDPresenting {
                 usesScaleAnimation: presentation.usesScaleAnimation
             )
         ) { [weak self] in
-            guard let self, requestGeneration == self.generation else { return }
+            guard let self,
+                  lifecycleGeneration == self.lifecycleGeneration else {
+                return
+            }
             self.panel.orderOut(nil)
             self.phase = .hidden
+            self.lifecycleGeneration += 1
         }
     }
 }

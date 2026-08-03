@@ -111,8 +111,14 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
 
         XCTAssertEqual(announcement.scheduledIntervals, [0.10])
-        XCTAssertEqual(fade.scheduledIntervals, [1.56])
-        XCTAssertEqual(hide.scheduledIntervals, [1.65])
+        XCTAssertEqual(
+            fade.scheduledIntervals,
+            [ShortcutHUDTiming.fadeDelay(usesScaleAnimation: true)]
+        )
+        XCTAssertEqual(
+            hide.scheduledIntervals,
+            [ShortcutHUDTiming.hideDelay(usesScaleAnimation: true)]
+        )
         XCTAssertEqual(presenter.phase, .visible)
         XCTAssertEqual(presenter.panel.frame.midX, display.frame.midX, accuracy: 0.001)
         XCTAssertEqual(presenter.panel.frame.midY, display.frame.midY, accuracy: 0.001)
@@ -129,20 +135,29 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         XCTAssertFalse(presenter.panel.isVisible)
     }
 
-    func testMotionTimingDefinesQuickSpringStableHoldAndFastExit() {
-        XCTAssertEqual(ShortcutHUDTiming.initialScale, 0.86)
+    func testMotionTimingDefinesCReboundAndDerivedSpringLifecycle() {
+        XCTAssertEqual(ShortcutHUDTiming.initialScale, 0.82)
         XCTAssertEqual(ShortcutHUDTiming.springResponse, 0.24)
-        XCTAssertEqual(ShortcutHUDTiming.springDampingFraction, 0.72)
+        XCTAssertEqual(ShortcutHUDTiming.springDampingFraction, 0.62)
         XCTAssertEqual(ShortcutHUDTiming.springSettlingDuration, 0.36)
-        XCTAssertEqual(ShortcutHUDTiming.stableHoldDuration, 1.20)
+        XCTAssertEqual(ShortcutHUDTiming.stableHoldDuration, 0.30)
         XCTAssertEqual(ShortcutHUDTiming.fadeOutDuration, 0.09)
+
+        let expectedFadeDelay = ShortcutHUDTiming.springSettlingDuration
+            + ShortcutHUDTiming.stableHoldDuration
+        XCTAssertEqual(expectedFadeDelay, 0.66, accuracy: 0.000_001)
+        XCTAssertEqual(
+            expectedFadeDelay + ShortcutHUDTiming.fadeOutDuration,
+            0.75,
+            accuracy: 0.000_001
+        )
         XCTAssertEqual(
             ShortcutHUDTiming.fadeDelay(usesScaleAnimation: true),
-            1.56
+            expectedFadeDelay
         )
         XCTAssertEqual(
             ShortcutHUDTiming.hideDelay(usesScaleAnimation: true),
-            1.65
+            expectedFadeDelay + ShortcutHUDTiming.fadeOutDuration
         )
     }
 
@@ -162,9 +177,110 @@ final class ShortcutHUDPresenterTests: XCTestCase {
 
         presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
 
-        XCTAssertEqual(fade.scheduledIntervals, [1.30])
-        XCTAssertEqual(hide.scheduledIntervals, [1.39])
+        let expectedFadeDelay = ShortcutHUDTiming.opacityEntryDuration
+            + ShortcutHUDTiming.stableHoldDuration
+        XCTAssertEqual(expectedFadeDelay, 0.40)
+        XCTAssertEqual(expectedFadeDelay + ShortcutHUDTiming.fadeOutDuration, 0.49)
+        XCTAssertEqual(fade.scheduledIntervals, [expectedFadeDelay])
+        XCTAssertEqual(
+            hide.scheduledIntervals,
+            [expectedFadeDelay + ShortcutHUDTiming.fadeOutDuration]
+        )
         XCTAssertEqual(presenter.viewModel.scale, 1)
+    }
+
+    func testPresenterStagesInitialSpringBeforeSchedulingVisualLifecycle() {
+        let entry = CapturingShortcutHUDEntryEnqueuer()
+        let fade = CapturingShortcutHUDScheduler()
+        let hide = CapturingShortcutHUDScheduler()
+        let display = DisplayFrame(
+            frame: CGRect(x: 0, y: 0, width: 1000, height: 800),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1000, height: 775),
+            isMain: true
+        )
+        let presenter = makePresenter(
+            fadeScheduler: fade,
+            hideScheduler: hide,
+            entryEnqueuer: entry
+        )
+
+        presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
+
+        XCTAssertEqual(presenter.phase, .visible)
+        XCTAssertEqual(presenter.viewModel.opacity, 0)
+        XCTAssertEqual(presenter.viewModel.scale, ShortcutHUDTiming.initialScale)
+        XCTAssertEqual(entry.enqueuedActionCount, 1)
+        XCTAssertTrue(fade.scheduledIntervals.isEmpty)
+        XCTAssertTrue(hide.scheduledIntervals.isEmpty)
+
+        entry.fireLatest()
+
+        XCTAssertEqual(presenter.viewModel.opacity, 1)
+        XCTAssertEqual(presenter.viewModel.scale, 1)
+        XCTAssertEqual(
+            fade.scheduledIntervals,
+            [ShortcutHUDTiming.fadeDelay(usesScaleAnimation: true)]
+        )
+        XCTAssertEqual(
+            hide.scheduledIntervals,
+            [ShortcutHUDTiming.hideDelay(usesScaleAnimation: true)]
+        )
+    }
+
+    func testVisibleRefreshUpdatesPayloadWithoutExtendingVisualLifecycle() {
+        let fade = CapturingShortcutHUDScheduler()
+        let hide = CapturingShortcutHUDScheduler()
+        let presenter = makePresenter(
+            fadeScheduler: fade,
+            hideScheduler: hide
+        )
+        let display = DisplayFrame(
+            frame: CGRect(x: 0, y: 0, width: 1000, height: 800),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1000, height: 775),
+            isMain: true
+        )
+
+        presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
+        presenter.present(payload(action: .appHotKeysDisabled, name: "Notes"), on: display)
+
+        XCTAssertEqual(fade.scheduledIntervals.count, 1)
+        XCTAssertEqual(hide.scheduledIntervals.count, 1)
+
+        fade.fire(at: 0)
+        XCTAssertEqual(presenter.phase, .fadingOut)
+        hide.fire(at: 0)
+        XCTAssertEqual(presenter.phase, .hidden)
+    }
+
+    func testFadeRecoveryStartsNewLifecycleWithoutRestartingSpring() {
+        let entry = CapturingShortcutHUDEntryEnqueuer()
+        let fade = CapturingShortcutHUDScheduler()
+        let hide = CapturingShortcutHUDScheduler()
+        let presenter = makePresenter(
+            fadeScheduler: fade,
+            hideScheduler: hide,
+            entryEnqueuer: entry
+        )
+        let display = DisplayFrame(
+            frame: CGRect(x: 0, y: 0, width: 1000, height: 800),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1000, height: 775),
+            isMain: true
+        )
+
+        presenter.present(payload(action: .appActivated, name: "Safari"), on: display)
+        entry.fireLatest()
+        fade.fireLatest()
+        presenter.present(payload(action: .appHotKeysDisabled, name: "Notes"), on: display)
+
+        XCTAssertEqual(entry.enqueuedActionCount, 1)
+        XCTAssertEqual(presenter.phase, .visible)
+        XCTAssertEqual(presenter.viewModel.opacity, 1)
+        XCTAssertEqual(presenter.viewModel.scale, 1)
+        XCTAssertEqual(fade.scheduledIntervals.count, 2)
+        XCTAssertEqual(hide.scheduledIntervals.count, 2)
+
+        hide.fire(at: 0)
+        XCTAssertEqual(presenter.phase, .visible)
     }
 
     func testRapidReplacementAnnouncesOnlyLatestPayload() {
@@ -183,7 +299,7 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         XCTAssertFalse(presenter.panel.isVisible)
     }
 
-    func testCancelledGenerationCallbacksCannotMutateLatestRequest() {
+    func testStaleAnnouncementIsIgnoredWhileLeadingVisualLifecycleRemainsValid() {
         let fade = CapturingShortcutHUDScheduler()
         let hide = CapturingShortcutHUDScheduler()
         let announcement = CapturingShortcutHUDScheduler()
@@ -207,8 +323,8 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         hide.fire(at: 0)
 
         XCTAssertTrue(announcer.messages.isEmpty)
-        XCTAssertEqual(presenter.phase, .visible)
-        XCTAssertTrue(presenter.panel.isVisible)
+        XCTAssertEqual(presenter.phase, .hidden)
+        XCTAssertFalse(presenter.panel.isVisible)
 
         announcement.fire(at: 1)
         XCTAssertEqual(announcer.messages, ["Zap shortcuts enabled in Notes"])
@@ -308,18 +424,36 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         XCTAssertEqual(presenter.panel.frame.size, ShortcutHUDLayout.panelSize)
     }
 
-    func testPanelFrameIncludesShadowInsetAroundCenteredCard() {
+    func testPanelFrameIncludesMotionInsetAroundCenteredCard() {
         let presenter = makePresenter()
 
         XCTAssertEqual(presenter.panel.frame.size, ShortcutHUDLayout.panelSize)
-        XCTAssertGreaterThan(
+        XCTAssertEqual(
             presenter.panel.frame.width,
-            ShortcutHUDLayout.cardSize.width
+            ShortcutHUDLayout.cardSize.width + ShortcutHUDLayout.motionInset * 2
         )
-        XCTAssertGreaterThan(
+        XCTAssertEqual(
             presenter.panel.frame.height,
-            ShortcutHUDLayout.cardSize.height
+            ShortcutHUDLayout.cardSize.height + ShortcutHUDLayout.motionInset * 2
         )
+        XCTAssertFalse(presenter.panel.hasShadow)
+    }
+
+    func testMaterialViewUsesNativeHUDWindowConfigurationAndCornerClipping() {
+        let materialView = ShortcutHUDMaterialView(frame: .zero)
+
+        XCTAssertEqual(materialView.material, .hudWindow)
+        XCTAssertEqual(materialView.blendingMode, .behindWindow)
+        XCTAssertEqual(materialView.state, .active)
+        XCTAssertEqual(materialView.alphaValue, 0.72)
+        XCTAssertFalse(materialView.isEmphasized)
+        XCTAssertTrue(materialView.wantsLayer)
+        XCTAssertEqual(
+            materialView.layer?.cornerRadius,
+            ShortcutHUDLayout.cornerRadius
+        )
+        XCTAssertEqual(materialView.layer?.cornerCurve, .continuous)
+        XCTAssertTrue(materialView.layer?.masksToBounds == true)
     }
 
     func testPresenterPassesReduceMotionAndTransparencyIntoPresentation() {
@@ -338,6 +472,7 @@ final class ShortcutHUDPresenterTests: XCTestCase {
         fadeScheduler: CapturingShortcutHUDScheduler? = nil,
         hideScheduler: CapturingShortcutHUDScheduler? = nil,
         announcementScheduler: CapturingShortcutHUDScheduler? = nil,
+        entryEnqueuer: (any ShortcutHUDEntryEnqueuing)? = nil,
         announcer: (any ShortcutHUDAnnouncing)? = nil,
         orderFront: @escaping @MainActor (ShortcutHUDPanel) throws -> Void = {
             $0.orderFrontRegardless()
@@ -351,6 +486,7 @@ final class ShortcutHUDPresenterTests: XCTestCase {
             fadeScheduler: fadeScheduler ?? CapturingShortcutHUDScheduler(),
             hideScheduler: hideScheduler ?? CapturingShortcutHUDScheduler(),
             announcementScheduler: announcementScheduler ?? CapturingShortcutHUDScheduler(),
+            entryEnqueuer: entryEnqueuer ?? ImmediateShortcutHUDEntryEnqueuer(),
             orderFront: orderFront,
             reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency
@@ -367,6 +503,30 @@ final class ShortcutHUDPresenterTests: XCTestCase {
             bundleIdentifier: "com.example.\(name)",
             applicationURL: nil
         )
+    }
+}
+
+@MainActor
+private final class ImmediateShortcutHUDEntryEnqueuer: ShortcutHUDEntryEnqueuing {
+    func enqueue(action: @escaping @MainActor () -> Void) {
+        action()
+    }
+}
+
+@MainActor
+private final class CapturingShortcutHUDEntryEnqueuer: ShortcutHUDEntryEnqueuing {
+    private var actions: [@MainActor () -> Void] = []
+
+    var enqueuedActionCount: Int {
+        actions.count
+    }
+
+    func enqueue(action: @escaping @MainActor () -> Void) {
+        actions.append(action)
+    }
+
+    func fireLatest() {
+        actions.last?()
     }
 }
 

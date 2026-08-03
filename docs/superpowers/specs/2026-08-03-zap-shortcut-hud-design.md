@@ -68,13 +68,14 @@ Finder activation 또는 launch가 실패하면 launcher가 beep를 정확히 �
 HUD는 승인된 아이콘 중심 A안을 사용한다.
 
 - 보이는 HUD card 크기: 132×132pt
-- panel frame: card 외곽 shadow inset을 포함하며 card보다 클 수 있음
+- panel frame: C-style spring 중 card가 잘리지 않도록 투명 `motionInset`을 포함하며 card보다 클 수 있음
 - corner radius: 32pt
 - 위치: 선택된 화면 전체 frame의 정중앙
-- 배경: 어두운 반투명 material
+- 배경: standard 상태에서는 HUD 전용 `NSVisualEffectView`의 `.hudWindow` material, `.behindWindow` blending mode, `.active` state를 사용한다. effect view는 `alphaValue = 0.72`, `isEmphasized = false`, corner radius와 layer clipping을 적용한다. 이 투명도는 icon, badge, border에는 적용하지 않는다.
+- Reduce Transparency 배경: native material 대신 불투명도 높은 어두운 색을 사용한다.
 - 외곽선: top-leading white highlight에서 bottom-trailing의 옅은 blue/white로 이어지는 얇은 gradient glass stroke
 - 내부 경계: card 안쪽 4pt 지점의 낮은 opacity inner highlight
-- shadow: 화면 배경과 분리되는 부드러운 외곽 shadow
+- shadow: visible outer shadow를 사용하지 않는다. panel의 투명 여백은 shadow가 아니라 spring motion clipping 방지용이다.
 - 앱 아이콘: 76×76pt
 - 앱 활성화 또는 실행: badge 없음
 - 앱별 Disable: 오른쪽 아래 빨간 원형 `−` badge
@@ -87,19 +88,20 @@ HUD는 승인된 아이콘 중심 A안을 사용한다.
 
 기본 animation은 비교 prototype의 C(Spring overshoot)를 production에 맞게 완화한 모션을 사용한다.
 
-1. opacity entry: 0.10초 ease-out
-2. card 전체 scale: `0.86 → 1.0`, `response: 0.24`, `dampingFraction: 0.72`, `blendDuration: 0` spring
-3. spring 안정 시간: 약 0.36초
-4. 안정된 선명 상태 유지: 1.20초
-5. 요청 후 1.56초에 opacity-only fade-out 시작
-6. fade-out: 0.09초 ease-out
-7. 요청 후 1.65초에 panel 숨김
+1. animation 없는 pre-state: opacity `0`, scale `0.82`를 먼저 화면에 확정한다.
+2. next main-run-loop turn에서 opacity entry: 0.10초 ease-out
+3. 같은 turn에서 card 전체 scale: C-style의 빠른 pop-in과 한 번의 작은 rebound가 보이도록 설정한 SwiftUI spring으로 `0.82 → 1.0`을 적용한다. `response: 0.24`, `dampingFraction: 0.62`, `blendDuration: 0`을 사용한다.
+4. spring 안정 시간: 약 0.36초
+5. 안정된 선명 상태 유지: 0.30초
+6. 기본 모션 fade-out 시작: `springSettlingDuration + stableHoldDuration` (= 0.66초)
+7. fade-out: 0.09초 ease-out, opacity-only
+8. 기본 모션 panel hide: `fadeDelay + fadeOutDuration` (= 0.75초)
 
-Spring은 card, icon, badge 전체에 적용하고 한 번만 작게 반동한 뒤 즉시 안정되어야 한다. 퇴장 시 scale, blur, 잔상 layer는 변경하거나 추가하지 않는다. Glass outer stroke와 inner highlight도 고정된 상태로 유지한다.
+Spring은 card, icon, badge 전체에 적용하고 C-style로 한 번만 작게 반동한 뒤 즉시 안정되어야 한다. pre-state와 target을 같은 transaction에서 합치지 않으며, 퇴장 시 scale, blur, 잔상 layer는 변경하거나 추가하지 않는다. Glass outer stroke와 inner highlight도 고정된 상태로 유지한다.
 
-빠르게 연속 입력하면 기존 dismiss 작업을 취소하고 새 payload와 대상 화면으로 숨김 없이 즉시 교체한다. 이미 panel이 표시 중이면 entry animation은 재시작하지 않고 현재 opacity와 scale을 유지하며, fade-out 시작 시점과 hide deadline만 새 요청을 기준으로 다시 계산한다. 새 요청의 대상 화면이 바뀌면 panel도 새 화면 중앙으로 이동한다. Timing 테스트의 허용 오차는 ±0.05초다.
+빠르게 연속 입력하면 HUD burst의 payload와 대상 화면을 숨김 없이 즉시 최신 값으로 교체한다. Entry pending 또는 이미 panel이 표시 중인 경우 entry animation과 최초 fade/hide deadline은 재시작하거나 연장하지 않는다. 따라서 반복 입력이 HUD를 무한히 붙잡아 두지 않는다. Fade-out 중 새 요청은 fade-out을 취소하고 opacity와 scale을 즉시 1.0으로 복원한 뒤 새 lifecycle의 유지 및 fade-out 일정을 시작하지만, spring은 재시작하지 않는다. 새 요청의 대상 화면이 바뀌면 panel도 새 화면 중앙으로 이동한다. Timing 테스트의 허용 오차는 ±0.05초다.
 
-Reduce Motion이 활성화되면 scale/spring을 제거한다. 0.10초 opacity entry 후 1.20초 유지하고 요청 후 1.30초에 0.09초 opacity-only fade-out을 시작해 1.39초에 panel을 숨긴다. Reduce Transparency가 활성화되면 반투명 material 대신 불투명도가 높은 어두운 배경을 사용하며 glass 경계 표현은 유지한다.
+Reduce Motion이 활성화되면 scale/spring을 제거한다. 0.10초 opacity entry 후 0.30초 유지하고 `opacityEntryDuration + stableHoldDuration` (= 0.40초)에 0.09초 opacity-only fade-out을 시작해 `fadeDelay + fadeOutDuration` (= 0.49초)에 panel을 숨긴다. Reduce Transparency가 활성화되면 native `NSVisualEffectView` material 대신 불투명도가 높은 어두운 배경을 사용하며 glass 경계 표현은 유지한다.
 
 ## 실행 결과 모델
 
@@ -293,9 +295,10 @@ Production panel contract:
 - presenter가 하나의 panel을 strong reference로 보유하고 `close` 대신 `orderOut`으로 숨김
 - `NSApp.activate`, `makeKeyAndOrderFront`, `makeMain`을 호출하지 않고 `orderFrontRegardless()`처럼 non-activating ordering 사용
 - `present`는 non-throwing이며 내부 표시 실패를 삼키고 원래 action 결과를 유지
-- content 배경은 투명하고 SwiftUI HUD view가 material, corner radius, shadow를 렌더링
+- content 배경은 투명하다. SwiftUI HUD view는 HUD 전용 AppKit bridge를 통해 standard 상태의 `NSVisualEffectView(.hudWindow, .behindWindow, .active)` surface를 `alphaValue = 0.72`, non-emphasized state와 corner clipping으로 렌더링한다.
+- `NSPanel.hasShadow`와 card의 visible outer shadow를 모두 사용하지 않는다.
 
-보이는 HUD card bounds는 132×132pt다. Panel frame은 외곽 shadow가 잘리지 않을 inset을 포함할 수 있으며 132×132pt로 제한하지 않는다. Card 중심을 선택된 display frame의 중심에 맞춘다.
+보이는 HUD card bounds는 132×132pt다. Panel frame은 C-style rebound가 host view bounds에서 잘리지 않을 `motionInset`을 포함할 수 있으며 132×132pt로 제한하지 않는다. 이 여백은 visible shadow를 위한 것이 아니다. Card 중심을 선택된 display frame의 중심에 맞춘다.
 
 Delayed lifecycle은 기존 pause scheduler pattern과 같은 주입 가능한 abstraction을 사용한다.
 
@@ -306,9 +309,9 @@ protocol ShortcutHUDScheduling: AnyObject {
 }
 ```
 
-Presenter는 각 `present`마다 단조 증가하는 request generation을 발급하고 pending fade-out, hide, announcement 작업을 취소한다. 모든 delayed callback은 capture한 generation이 현재 generation과 일치할 때만 panel 또는 announcement state를 변경한다. 실제 시간 대기 대신 capturing scheduler로 테스트할 수 있어야 한다.
+Presenter는 매 `present`마다 단조 증가하는 request generation을 발급해 announcement debounce에서 최신 payload만 남긴다. Visual lifecycle은 별도의 lifecycle generation으로 관리한다. 새 hidden entry와 fade-out revival만 lifecycle generation을 갱신하고 fade/hide callback은 그것이 일치할 때만 panel state를 변경한다. Entry pre-state는 주입 가능한 next-main-turn enqueuer 뒤에 animation target으로 전환하며, 실제 시간 대기 대신 capturing enqueuer와 scheduler로 테스트할 수 있어야 한다.
 
-Presenter는 새 표시 요청을 받으면 icon과 badge를 갱신하고, card 중심을 정하고, accessibility 환경에 맞는 lifecycle을 시작한다. Visual phase는 `.hidden`, `.visible`, `.fadingOut`으로 유지하고 VoiceOver의 0.10초 debounce가 visual phase를 변경하지 않게 한다. Entry 중 새 요청은 현재 spring progress를 유지한 채 완료한다. 유지 구간의 새 요청은 opacity 1.0과 scale 1.0을 유지한다. Fade-out 중 새 요청은 fade-out을 취소하고 opacity와 scale을 즉시 1.0으로 복원한 뒤 새 요청 기준의 유지 및 fade-out 일정을 시작한다. 모든 경우 panel을 숨기거나 entry animation을 처음부터 재시작하지 않는다.
+Presenter는 새 표시 요청을 받으면 icon과 badge를 갱신하고, card 중심을 정하고, accessibility 환경에 맞는 lifecycle을 시작한다. Visual phase는 `.hidden`, `.visible`, `.fadingOut`으로 유지하고 VoiceOver의 0.10초 debounce가 visual phase를 변경하지 않게 한다. Entry 중 새 요청은 현재 spring progress를 유지한 채 완료한다. 유지 구간의 새 요청은 payload와 position만 바꾸며 최초 fade/hide deadline을 연장하지 않는다. Fade-out 중 새 요청은 fade-out을 취소하고 opacity와 scale을 즉시 1.0으로 복원한 뒤 새 lifecycle의 유지 및 fade-out 일정을 시작하지만 spring을 다시 시작하지 않는다. 모든 경우 panel을 숨기거나 entry animation을 처음부터 재시작하지 않는다.
 
 ## 접근성
 
@@ -416,19 +419,22 @@ Panel 또는 announcement 실패가 앱 실행이나 앱별 상태 mutation을 �
 3. Panel이 mouse event를 무시하고, deactivate 시 숨지 않으며, close 시 release되지 않는다.
 4. Zap을 foreground로 활성화하거나 key/main window로 만들지 않는다.
 5. 하나의 panel instance를 재사용하고 `orderOut`으로 숨긴다.
-6. 보이는 card가 132×132pt이며 card 중심이 선택된 display frame 중앙에 맞고 shadow가 panel bounds에서 잘리지 않는다.
-7. Icon은 application URL, bundle identifier, 기본 application icon 순으로 resolve한다.
-8. Entry 중 새 요청은 현재 progress를 유지하고, fade-out 중 새 요청은 opacity와 scale을 1.0으로 복원한다.
-9. 일반 모션은 fade 1.56초, hide 1.65초를 예약하고 Reduce Motion은 fade 1.30초, hide 1.39초를 예약한다.
-10. Fade callback은 opacity만 변경하고 scale 1.0을 유지한다.
-11. Request generation이 오래된 fade-out, hide, announcement callback의 state 변경을 막는다.
-12. 빠른 A→B 요청은 0.10초 debounce 후 B만 정확히 한 번 announce하고 A는 announce하지 않는다.
-13. Announcement callback은 visual phase를 변경하지 않는다.
-14. Panel 표시가 실패해도 성공 action의 accessibility announcement를 시도한다.
-15. `display == nil`이면 panel을 표시하지 않고 accessibility announcement만 시도한다.
-16. Announcement 실패가 시각 HUD나 원래 action 결과를 변경하지 않는다.
+6. 보이는 card가 132×132pt이며 card 중심이 선택된 display frame 중앙에 맞고, visible outer shadow 없이 `motionInset`이 C rebound clipping을 막는다.
+7. Standard HUD material bridge가 `.hudWindow`, `.behindWindow`, `.active`, `alphaValue = 0.72`, non-emphasized state와 32pt corner clipping을 사용하며, Reduce Transparency에서는 opaque fallback만 사용한다.
+8. Icon은 application URL, bundle identifier, 기본 application icon 순으로 resolve한다.
+9. Entry pre-state의 opacity 0과 scale 0.82가 next-main-turn spring target 전에 확정되고, 그 뒤에만 fade/hide를 예약한다.
+10. Entry 중 새 요청은 현재 progress를 유지하며, `.visible`의 새 요청은 payload만 갱신하고 최초 fade/hide deadline을 연장하지 않는다.
+11. Fade-out 중 새 요청은 opacity와 scale을 1.0으로 복원하고 새 lifecycle을 예약하지만 spring을 재시작하지 않는다.
+12. 일반 모션은 `springSettlingDuration + stableHoldDuration` (= 0.66초) fade 및 그 값에 `fadeOutDuration`을 더한 (= 0.75초) hide를 예약하고, Reduce Motion은 `opacityEntryDuration + stableHoldDuration` (= 0.40초)과 `fadeOutDuration` (= 0.49초)으로 같은 관계를 계산한다.
+13. Fade callback은 opacity만 변경하고 scale 1.0을 유지한다.
+14. lifecycle generation이 오래된 fade-out과 hide callback의 state 변경을 막고, request generation은 오래된 announcement callback을 막는다.
+15. 빠른 A→B 요청은 0.10초 debounce 후 B만 정확히 한 번 announce하고 A는 announce하지 않는다.
+16. Announcement callback은 visual phase를 변경하지 않는다.
+17. Panel 표시가 실패해도 성공 action의 accessibility announcement를 시도한다.
+18. `display == nil`이면 panel을 표시하지 않고 accessibility announcement만 시도한다.
+19. Announcement 실패가 시각 HUD나 원래 action 결과를 변경하지 않는다.
 
-Glass border, material, shadow, 실제 spring/fade의 시각 품질과 타사 전체 화면 앱 위 표시 여부는 수동 검증한다. 이번 기능을 위해 snapshot 또는 SwiftUI view-inspection dependency를 추가하지 않는다.
+Native material, glass border, visible outer shadow 부재, 실제 C rebound/fade의 시각 품질과 타사 전체 화면 앱 위 표시 여부는 수동 검증한다. 이번 기능을 위해 snapshot 또는 SwiftUI view-inspection dependency를 추가하지 않는다.
 
 ### 회귀 검증
 
@@ -445,12 +451,14 @@ make dev-build CODESIGN_IDENTITY=-
 4. 현재 앱 토글 단축키로 Disable과 Enable badge를 확인한다.
 5. Manual, Window Management, Dock/Finder/menu action에 HUD가 나타나지 않는지 확인한다.
 6. HUD 표시 중 키보드 focus와 target app activation이 유지되는지 확인한다.
-7. Finder와 Dock 단축키를 빠르게 연속 입력해 최신 HUD 교체와 dismiss timing을 확인한다.
-8. 기본 모션이 빠르게 나타나 한 번만 작게 반동하고, 약 1.20초 선명하게 유지된 뒤 scale/blur 없이 빠르게 fade되는지 확인한다.
-9. Reduce Motion과 Reduce Transparency 설정에서 fallback 표현을 확인한다.
-10. 전체 화면 앱 위에서 HUD가 표시되는지 확인한다.
-11. 실제 glass border, material, shadow, spring/fade 품질과 shadow clipping이 없는지 확인한다.
-12. VoiceOver에서 English announcement가 보이는 HUD와 동일한 마지막 action을 설명하는지 확인한다.
+7. Finder와 Dock 단축키를 빠르게 연속 입력해 최신 HUD가 교체되되, 최초 HUD의 dismiss deadline이 연장되지 않는지 확인한다.
+8. 기본 모션이 pre-state에서 빠르게 나타나 C-style로 한 번만 작게 반동하고, 총 약 0.75초 후 scale/blur 없이 빠르게 사라지는지 확인한다.
+9. standard HUD가 wallpaper와 busy app content 위에서 icon/badge/border는 선명한 채 `alphaValue = 0.72` native `.hudWindow` glass backdrop으로 보이고, visible outer shadow가 없는지 확인한다.
+10. Fade-out 중 새 입력에서 flash나 새 bounce 없이 full opacity로 복원되는지 확인한다.
+11. Reduce Motion에서는 약 0.49초의 opacity-only, Reduce Transparency에서는 opaque dark fallback이 적용되는지 확인한다.
+12. 전체 화면 앱 위에서 HUD가 표시되는지 확인한다.
+13. `motionInset`이 C rebound를 잘리지 않게 하며 glass border, native material, rebound/fade 품질이 의도대로인지 확인한다.
+14. VoiceOver에서 English announcement가 보이는 HUD와 동일한 마지막 action을 설명하는지 확인한다.
 
 ## 구현 순서
 
