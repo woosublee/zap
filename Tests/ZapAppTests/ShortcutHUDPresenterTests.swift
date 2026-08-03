@@ -5,6 +5,38 @@ import XCTest
 
 @MainActor
 final class ShortcutHUDPresenterTests: XCTestCase {
+    func testTimerSchedulerIgnoresStaleCallbackAfterReplacement() async {
+        var callbacks: [@Sendable (Timer) -> Void] = []
+        var timers: [Timer] = []
+        let scheduler = TimerShortcutHUDScheduler(
+            makeTimer: { interval, callback in
+                let timer = Timer(
+                    timeInterval: interval,
+                    repeats: false,
+                    block: { _ in }
+                )
+                callbacks.append(callback)
+                timers.append(timer)
+                return timer
+            },
+            addTimer: { _ in }
+        )
+        var actions: [String] = []
+
+        scheduler.schedule(after: 1) { actions.append("first") }
+        callbacks[0](timers[0])
+        scheduler.schedule(after: 1) { actions.append("second") }
+        await Task.yield()
+
+        XCTAssertTrue(actions.isEmpty)
+
+        scheduler.cancel()
+        callbacks[1](timers[1])
+        await Task.yield()
+
+        XCTAssertTrue(actions.isEmpty)
+    }
+
     func testPanelUsesNonActivatingFullScreenAuxiliaryContract() {
         let presenter = makePresenter()
         let panel = presenter.panel

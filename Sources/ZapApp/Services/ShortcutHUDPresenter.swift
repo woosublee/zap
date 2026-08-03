@@ -15,6 +15,26 @@ protocol ShortcutHUDScheduling: AnyObject {
 @MainActor
 final class TimerShortcutHUDScheduler: ShortcutHUDScheduling {
     private var timer: Timer?
+    private let makeTimer: (
+        TimeInterval,
+        @escaping @Sendable (Timer) -> Void
+    ) -> Timer
+    private let addTimer: (Timer) -> Void
+
+    init(
+        makeTimer: @escaping (
+            TimeInterval,
+            @escaping @Sendable (Timer) -> Void
+        ) -> Timer = {
+            Timer(timeInterval: $0, repeats: false, block: $1)
+        },
+        addTimer: @escaping (Timer) -> Void = {
+            RunLoop.main.add($0, forMode: .common)
+        }
+    ) {
+        self.makeTimer = makeTimer
+        self.addTimer = addTimer
+    }
 
     func schedule(
         after interval: TimeInterval,
@@ -25,14 +45,19 @@ final class TimerShortcutHUDScheduler: ShortcutHUDScheduling {
             action()
             return
         }
-        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.timer = nil
+        let timer = makeTimer(interval) { [weak self] firedTimer in
+            Task { @MainActor [weak self, weak firedTimer] in
+                guard let self,
+                      let firedTimer,
+                      self.timer === firedTimer else {
+                    return
+                }
+                self.timer = nil
                 action()
             }
         }
         self.timer = timer
-        RunLoop.main.add(timer, forMode: .common)
+        addTimer(timer)
     }
 
     func cancel() {

@@ -474,7 +474,7 @@ final class ZapAppModel: ObservableObject {
 
     func activateManualShortcut(id: UUID) {
         guard let shortcut = manualShortcuts.first(where: { $0.id == id }) else {
-            NSSound.beep()
+            beep()
             return
         }
         activateDockItem(shortcut.dockItem) { _ in }

@@ -969,6 +969,22 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(hotKeyService.registrations.count, 1)
     }
 
+    func testMissingManualShortcutUsesInjectedBeep() {
+        var beepCount = 0
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+            ),
+            hotKeyService: CapturingHotKeyService(),
+            beep: { beepCount += 1 }
+        )
+
+        model.activateManualShortcut(id: UUID())
+
+        XCTAssertEqual(beepCount, 1)
+    }
+
     func testDirectMenuActionsRemainAvailableWhileHotKeysArePaused() {
         let dockItem = DockItem(
             name: "Terminal",
