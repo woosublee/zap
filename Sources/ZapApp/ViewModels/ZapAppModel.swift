@@ -127,7 +127,7 @@ final class ZapAppModel: ObservableObject {
         },
         { [weak self] in
             Task { @MainActor [weak self] in
-                self?.activateFinder()
+                self?.handleFinderHotKey()
             }
         },
         { [weak self] id in
@@ -426,16 +426,36 @@ final class ZapAppModel: ObservableObject {
                   outcome == .activated || outcome == .launched else {
                 return
             }
-            let payload = ShortcutHUDPayload.appActivated(
+            let application = ShortcutHUDApplication(
                 item: item,
                 localizedDisplayName: self.shortcutHUDLocalizedDisplayName
+            )
+            let payload = ShortcutHUDPayload.appActivated(
+                application: application
+            )
+            self.shortcutHUDPresenter.present(payload, on: display)
+        }
+    }
+
+    func handleFinderHotKey() {
+        let generation = beginShortcutHUDRequest()
+        let display = shortcutHUDScreenResolver.resolveScreenBeforeAction()
+
+        appLauncher.activateFinder { [weak self] outcome in
+            guard let self,
+                  generation == self.shortcutHUDRequestGeneration,
+                  outcome == .activated || outcome == .launched else {
+                return
+            }
+            let payload = ShortcutHUDPayload.appActivated(
+                application: .finder
             )
             self.shortcutHUDPresenter.present(payload, on: display)
         }
     }
 
     func activateFinder() {
-        appLauncher.activateFinder()
+        appLauncher.activateFinder { _ in }
     }
 
     func addManualShortcut(appURL: URL) {

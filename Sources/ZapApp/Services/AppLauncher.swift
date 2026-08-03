@@ -12,7 +12,9 @@ protocol AppLaunching {
         _ item: DockItem,
         completion: @escaping (AppLaunchOutcome) -> Void
     )
-    func activateFinder()
+    func activateFinder(
+        completion: @escaping (AppLaunchOutcome) -> Void
+    )
 }
 
 @MainActor
@@ -99,28 +101,44 @@ struct AppLauncher: AppLaunching {
         }
     }
 
-    func activateFinder() {
+    func activateFinder(
+        completion: @escaping (AppLaunchOutcome) -> Void
+    ) {
+        var didComplete = false
+        let finish: @MainActor (AppLaunchOutcome) -> Void = { outcome in
+            guard !didComplete else { return }
+            didComplete = true
+            if outcome == .failed {
+                beep()
+            }
+            completion(outcome)
+        }
+
         let bundleIdentifier = "com.apple.finder"
         if let runningApp = runningApplication(bundleIdentifier) {
-            _ = activateRunningApplication(
+            let activated = activateRunningApplication(
                 runningApp,
                 [.activateAllWindows, .activateIgnoringOtherApps]
             )
+            guard activated else {
+                finish(.failed)
+                return
+            }
             sendReopenEventHandler(runningApp)
+            finish(.activated)
             return
         }
 
         guard let url = applicationURL(bundleIdentifier) else {
-            beep()
+            finish(.failed)
             return
         }
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
-        openApplication(url, configuration) { _, error in
-            guard error != nil else { return }
+        openApplication(url, configuration) { runningApp, error in
             Task { @MainActor in
-                beep()
+                finish(error == nil && runningApp != nil ? .launched : .failed)
             }
         }
     }
