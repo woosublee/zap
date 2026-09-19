@@ -515,17 +515,15 @@ final class ZapAppModel: ObservableObject {
             return
         }
 
-        let scope: GlobalHotKeyRegistrationScope = isActiveApplicationDisabled
-            ? .activeApplicationToggleOnly
-            : .all
-
         registrationError = hotKeyService.register(
             modifiers: selectedModifiers,
             finderShortcutEnabled: isFinderShortcutEnabled,
             manualShortcuts: manualShortcuts,
-            windowShortcuts: windowManagementModel.windowShortcutsForRegistration,
+            windowShortcuts: isActiveApplicationDisabled
+                ? []
+                : windowManagementModel.windowShortcutsForRegistration,
             activeApplicationToggleShortcut: activeApplicationToggleShortcut,
-            scope: scope
+            scope: .all
         )
     }
 

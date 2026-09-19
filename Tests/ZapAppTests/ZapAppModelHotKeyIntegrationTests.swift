@@ -935,10 +935,14 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(model.disabledApplications, [notes.bundleIdentifier: notes.name])
     }
 
-    func testDisabledActiveApplicationKeepsOnlyControlRegistrationAndSecondToggleRestoresAll() {
+    func testDisabledActiveApplicationExcludesOnlyWindowShortcutsAndSecondToggleRestoresThem() throws {
         let suiteName = "ActiveApplicationToggleScope.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
+        let manualID = UUID()
+        storeManualShortcuts([manualShortcut(id: manualID, keyCode: 45, modifiers: [.control])])
+        UserDefaults.standard.set(true, forKey: "finder_shortcut_enabled")
+        let windowShortcuts = [windowShortcut(.leftHalf, keyCode: 123, modifiers: [.option, .command])]
 
         storeActiveApplicationToggleShortcut(
             ActiveApplicationToggleShortcut(
@@ -953,7 +957,8 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         let model = makeModel(
             windowManagementModel: WindowManagementModel(
                 service: CapturingWindowManagementPerformer(),
-                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: windowShortcuts),
+                isWindowManagementEnabled: true
             ),
             hotKeyService: hotKeyService,
             userDefaults: defaults,
@@ -974,10 +979,22 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
 
         XCTAssertTrue(model.isActiveApplicationDisabled)
         XCTAssertEqual(hotKeyService.unregisterCallCount, 0)
-        XCTAssertEqual(
-            hotKeyService.registrations.last?.scope,
-            .activeApplicationToggleOnly
-        )
+        let registration = try XCTUnwrap(hotKeyService.registrations.last)
+        XCTAssertEqual(registration.windowShortcuts, [])
+        XCTAssertEqual(model.windowManagementModel.windowShortcuts, windowShortcuts)
+        let plan = registration.plan
+        let owners = plan.hotKeys.map(\.owner)
+        for numberKey in NumberKey.allCases {
+            XCTAssertTrue(owners.contains(.dock(numberKey)))
+        }
+        XCTAssertTrue(owners.contains(.finder))
+        XCTAssertTrue(owners.contains(.manual(manualID, name: "Manual App")))
+        XCTAssertTrue(owners.contains(.activeApplicationToggle))
+        XCTAssertFalse(owners.contains {
+            if case .window = $0 { return true }
+            return false
+        })
+        XCTAssertEqual(plan.errors, [])
 
         XCTAssertEqual(
             model.toggleHotKeysForActiveApplication(),
@@ -986,6 +1003,7 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
 
         XCTAssertFalse(model.isActiveApplicationDisabled)
         XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
+        XCTAssertEqual(hotKeyService.registrations.last?.windowShortcuts, windowShortcuts)
     }
 
     func testGlobalPauseUnregistersControlAndRegularHotKeys() {
@@ -1047,14 +1065,16 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
         XCTAssertEqual(hotKeyService.registrations, [])
     }
 
-    func testDisabledActiveApplicationUsesControlOnlyRegistrationAndOtherApplicationRestoresAll() async {
+    func testDisabledActiveApplicationExcludesWindowShortcutsAndOtherApplicationRestoresThem() async {
         let workspaceNotifications = NotificationCenter()
         var currentApplication = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        let windowShortcuts = [windowShortcut(.leftHalf, keyCode: 123, modifiers: [.option, .command])]
         let hotKeyService = CapturingHotKeyService()
         let model = makeModel(
             windowManagementModel: WindowManagementModel(
                 service: CapturingWindowManagementPerformer(),
-                shortcutStore: InMemoryWindowShortcutStore(shortcuts: [])
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: windowShortcuts),
+                isWindowManagementEnabled: true
             ),
             hotKeyService: hotKeyService,
             activeApplicationProvider: { currentApplication },
@@ -1065,7 +1085,8 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
 
         model.toggleHotKeysForActiveApplication()
         XCTAssertEqual(hotKeyService.unregisterCallCount, 0)
-        XCTAssertEqual(hotKeyService.registrations.last?.scope, .activeApplicationToggleOnly)
+        XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
+        XCTAssertEqual(hotKeyService.registrations.last?.windowShortcuts, [])
         XCTAssertTrue(model.isActiveApplicationDisabled)
 
         currentApplication = ActiveApplication(name: "Notes", bundleIdentifier: "com.apple.Notes")
@@ -1074,13 +1095,55 @@ final class ZapAppModelHotKeyIntegrationTests: XCTestCase {
 
         XCTAssertEqual(model.activeApplication, currentApplication)
         XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
+        XCTAssertEqual(hotKeyService.registrations.last?.windowShortcuts, windowShortcuts)
 
         currentApplication = ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
         workspaceNotifications.post(name: NSWorkspace.didActivateApplicationNotification, object: nil)
         await Task.yield()
 
-        XCTAssertEqual(hotKeyService.registrations.last?.scope, .activeApplicationToggleOnly)
+        XCTAssertEqual(hotKeyService.registrations.last?.scope, .all)
+        XCTAssertEqual(hotKeyService.registrations.last?.windowShortcuts, [])
         XCTAssertTrue(model.isActiveApplicationDisabled)
+    }
+
+    func testResumingHotKeysInPersistedDisabledApplicationKeepsWindowShortcutsExcluded() throws {
+        let suiteName = "DisabledApplicationResume.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(["com.apple.Safari": "Safari"], forKey: "disabled_hot_key_applications")
+        let windowShortcuts = [windowShortcut(.leftHalf, keyCode: 123, modifiers: [.option, .command])]
+        let hotKeyService = CapturingHotKeyService()
+        let model = makeModel(
+            windowManagementModel: WindowManagementModel(
+                service: CapturingWindowManagementPerformer(),
+                shortcutStore: InMemoryWindowShortcutStore(shortcuts: windowShortcuts),
+                isWindowManagementEnabled: true
+            ),
+            hotKeyService: hotKeyService,
+            userDefaults: defaults,
+            activeApplicationProvider: {
+                ActiveApplication(name: "Safari", bundleIdentifier: "com.apple.Safari")
+            }
+        )
+        let initialRegistration = try XCTUnwrap(hotKeyService.registrations.last)
+        XCTAssertEqual(initialRegistration.activeApplicationToggleShortcut, .unset)
+        XCTAssertEqual(initialRegistration.windowShortcuts, [])
+        XCTAssertTrue(initialRegistration.plan.hotKeys.contains { $0.owner == .dock(.one) })
+        hotKeyService.registrations.removeAll()
+        hotKeyService.unregisterCallCount = 0
+
+        model.pauseHotKeysIndefinitely()
+
+        XCTAssertEqual(hotKeyService.unregisterCallCount, 1)
+        XCTAssertEqual(hotKeyService.registrations, [])
+
+        model.resumeHotKeys()
+
+        XCTAssertTrue(model.isActiveApplicationDisabled)
+        let resumedRegistration = try XCTUnwrap(hotKeyService.registrations.last)
+        XCTAssertEqual(resumedRegistration.windowShortcuts, [])
+        XCTAssertTrue(resumedRegistration.plan.hotKeys.contains { $0.owner == .dock(.one) })
+        XCTAssertEqual(model.windowManagementModel.windowShortcuts, windowShortcuts)
     }
 
     func testPausedStateAndDisabledApplicationsRestoreFromUserDefaults() {
@@ -1327,6 +1390,17 @@ private final class CapturingHotKeyService: GlobalHotKeyServicing {
         let windowShortcuts: [WindowShortcut]
         let activeApplicationToggleShortcut: ActiveApplicationToggleShortcut
         let scope: GlobalHotKeyRegistrationScope
+
+        var plan: HotKeyRegistrationPlan {
+            GlobalHotKeyRegistrationPlanner().plan(
+                modifiers: modifiers,
+                finderShortcutEnabled: finderShortcutEnabled,
+                manualShortcuts: manualShortcuts,
+                windowShortcuts: windowShortcuts,
+                activeApplicationToggleShortcut: activeApplicationToggleShortcut,
+                scope: scope
+            )
+        }
     }
 
     struct Callbacks: @unchecked Sendable {
