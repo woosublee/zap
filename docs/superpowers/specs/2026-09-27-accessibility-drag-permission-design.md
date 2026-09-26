@@ -59,7 +59,7 @@ protocol AccessibilityPermissionGuiding {
 - `start(sourceFrame:)`
   - `AccessibilityPermissionChecking.isTrusted`가 true면 아무것도 하지 않는다.
   - 아니면 `authorize(pane: .accessibility, suggestedAppURLs: [Bundle.main.bundleURL], sourceFrameInScreen: sourceFrame)`를 호출한다.
-- 권한 페이지 표시 이름은 `PermissionFlowResources.accessibilityNameResource`를 노출하는 작은 정적 helper로 제공한다.
+- 권한 페이지 표시 이름은 PermissionFlow에 의존하지 않는 Zap 자체 helper `AccessibilityPaneName`이 OS 버전으로 결정한다(macOS 27+: `Device Control and Data Access`, 이전: `Accessibility`). Zap UI는 영어이고, `PermissionFlowResources.accessibilityNameResource`는 리소스 번들을 찾지 못하면 번역 키 문자열을 그대로 노출하므로 쓰지 않는다.
 
 ### `PermissionGuideThrottle` (신규)
 
@@ -76,10 +76,10 @@ protocol AccessibilityPermissionGuiding {
 
 ### `SettingsView` Permissions 섹션 (변경)
 
-- 행 제목은 OS 버전에 맞는 권한 페이지 이름(`accessibilityNameResource`)을 사용한다.
+- 행 제목은 `AccessibilityPaneName.current`를 사용한다.
 - 부제는 `Drag Zap into the list to let it move and resize windows.`로 바꾼다.
 - 버튼 이름을 `Request`에서 `Grant…`로 바꾼다.
-- 버튼의 화면 좌표 frame을 구해 `requestAccessibilityPermission(sourceFrame:)`에 전달한다. frame을 구하지 못하면 nil로 호출한다.
+- 클릭 시점의 `NSEvent.mouseLocation` 주변 32×32 사각형을 화면 좌표 source frame으로 만들어 `requestAccessibilityPermission(sourceFrame:)`에 전달한다(PermissionFlow의 `PermissionFlowButton`과 같은 방식).
 - 기존 `onAppear` / `didBecomeActive` 권한 재확인은 유지한다.
 
 ### `AccessibilityPermissionService` (유지)
@@ -141,5 +141,5 @@ protocol AccessibilityPermissionGuiding {
 1. `make dev-run`으로 실행하고, 시스템 설정의 손쉬운 사용 목록에서 Zap을 제거한다.
 2. Settings > General > `Grant…`를 누르면 패널이 버튼에서 설정 창으로 날아가 붙는지, 드래그가 되는지, 토글을 켠 뒤 "Granted"로 바뀌는지 확인한다.
 3. 권한을 다시 제거한 뒤 창 관리 단축키를 누르면 가이드가 한 번 뜨고, 반복해 눌러도 다시 뜨지 않는지 확인한다.
-4. macOS 27에서 행 제목이 "Device Control and Data Access"(한국어 환경에서는 해당 번역)로 표시되는지 확인한다.
+4. macOS 27에서 행 제목이 "Device Control and Data Access"로 표시되는지 확인한다.
 5. `make verify`에서 `codesign --verify --strict`가 통과하는지 확인한다.
