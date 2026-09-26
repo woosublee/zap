@@ -310,7 +310,8 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("WindowShortcutCategoryGroup"))
         XCTAssertTrue(source.contains("shortcutColumns"))
         XCTAssertTrue(source.contains("isLocked: !model.accessibilityTrusted"))
-        XCTAssertTrue(source.contains("Grant Accessibility in General to enable and run window shortcuts."))
+        XCTAssertTrue(source.contains("Grant \\(AccessibilityPaneName.current) in General to enable and run window shortcuts."))
+        XCTAssertFalse(source.contains("Grant Accessibility in General"))
     }
 
     func testWindowManagementSettingsReceivesAndDisplaysGlobalRegistrationError() throws {

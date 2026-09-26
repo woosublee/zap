@@ -38,7 +38,7 @@ struct WindowManagementSettingsView: View {
             }
 
             if !model.accessibilityTrusted {
-                Label("Grant Accessibility in General to enable and run window shortcuts.", systemImage: "lock.fill")
+                Label("Grant \(AccessibilityPaneName.current) in General to enable and run window shortcuts.", systemImage: "lock.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(10)
