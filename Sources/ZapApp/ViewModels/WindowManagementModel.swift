@@ -31,6 +31,8 @@ final class WindowManagementModel: ObservableObject {
 
     private let service: WindowActionPerforming
     private let permissionService: AccessibilityPermissionChecking
+    private let permissionGuide: AccessibilityPermissionGuiding
+    private var shortcutGuideThrottle = PermissionGuideThrottle()
     private let settingsOpener: SystemSettingsOpening
     private let shortcutStore: WindowShortcutStoring
     private let settingsStore: WindowManagementSettingsStoring
@@ -38,6 +40,7 @@ final class WindowManagementModel: ObservableObject {
     init(
         service: WindowActionPerforming = WindowManagementService(history: DefaultWindowHistoryRecorder()),
         permissionService: AccessibilityPermissionChecking = AccessibilityPermissionService(),
+        permissionGuide: AccessibilityPermissionGuiding? = nil,
         settingsOpener: SystemSettingsOpening = SystemSettingsOpener(),
         shortcutStore: WindowShortcutStoring = UserDefaultsWindowShortcutStore(),
         settingsStore: WindowManagementSettingsStoring = UserDefaultsWindowManagementSettingsStore(),
@@ -45,6 +48,7 @@ final class WindowManagementModel: ObservableObject {
     ) {
         self.service = service
         self.permissionService = permissionService
+        self.permissionGuide = permissionGuide ?? AccessibilityPermissionGuide(permission: permissionService)
         self.settingsOpener = settingsOpener
         self.shortcutStore = shortcutStore
         self.settingsStore = settingsStore
@@ -69,6 +73,9 @@ final class WindowManagementModel: ObservableObject {
             windowManagementError = nil
         case let .failure(error):
             windowManagementError = String(describing: error)
+            if case .accessibilityPermissionMissing = error, shortcutGuideThrottle.shouldStart() {
+                permissionGuide.start(sourceFrame: nil)
+            }
         }
         return result
     }
@@ -114,8 +121,8 @@ final class WindowManagementModel: ObservableObject {
         persistAndNotify()
     }
 
-    func requestAccessibilityPermission() {
-        permissionService.requestPrompt()
+    func requestAccessibilityPermission(sourceFrame: CGRect? = nil) {
+        permissionGuide.start(sourceFrame: sourceFrame)
     }
 
     func refreshAccessibilityPermission() {
