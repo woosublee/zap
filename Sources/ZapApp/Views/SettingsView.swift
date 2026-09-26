@@ -197,8 +197,8 @@ struct SettingsView: View {
     private var permissionsSection: some View {
         SettingsCard(title: "Permissions") {
             SettingsRow(
-                title: "Accessibility",
-                subtitle: "Allow Zap to move and resize windows.",
+                title: AccessibilityPaneName.current,
+                subtitle: "Drag Zap into the list to let it move and resize windows.",
                 leading: {
                     Image(systemName: "hand.raised.fill")
                         .font(.system(size: 18, weight: .semibold))
@@ -211,8 +211,10 @@ struct SettingsView: View {
                             .font(.system(.callout, design: .default, weight: .semibold))
                             .foregroundStyle(.green)
                     } else {
-                        Button("Request") {
-                            model.windowManagementModel.requestAccessibilityPermission()
+                        Button("Grant…") {
+                            model.windowManagementModel.requestAccessibilityPermission(
+                                sourceFrame: PermissionGuideSourceFrame.atMouse
+                            )
                             refreshAccessibilityPermission()
                         }
                         .buttonStyle(.borderedProminent)
