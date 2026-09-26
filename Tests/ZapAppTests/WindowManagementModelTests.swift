@@ -75,15 +75,18 @@ final class WindowManagementModelTests: XCTestCase {
         XCTAssertEqual(model.windowShortcutsForRegistration.count, WindowAction.allCases.count)
     }
 
-    func testPermissionButtonsRequestPromptRefreshStateAndOpenSettings() {
+    func testPermissionButtonsStartGuideRefreshStateAndOpenSettings() {
         let permission = FakeAccessibilityPermission(isTrusted: false)
+        let guide = FakePermissionGuide()
         let opener = FakeSystemSettingsOpener()
-        let model = makeModel(permission: permission, settingsOpener: opener)
+        let model = makeModel(permission: permission, permissionGuide: guide, settingsOpener: opener)
+        let frame = CGRect(x: 1, y: 2, width: 32, height: 32)
 
         XCTAssertFalse(model.accessibilityTrusted)
 
-        model.requestAccessibilityPermission()
-        XCTAssertEqual(permission.requestPromptCallCount, 1)
+        model.requestAccessibilityPermission(sourceFrame: frame)
+        model.requestAccessibilityPermission(sourceFrame: frame)
+        XCTAssertEqual(guide.startedFrames, [frame, frame])
 
         permission.trusted = true
         model.refreshAccessibilityPermission()
@@ -91,6 +94,39 @@ final class WindowManagementModelTests: XCTestCase {
 
         model.openAccessibilitySettings()
         XCTAssertEqual(opener.openSettingsCallCount, 1)
+    }
+
+    func testMissingPermissionStartsGuideOncePerSession() {
+        let service = FakeWindowActionPerformer(result: .failure(.accessibilityPermissionMissing))
+        let guide = FakePermissionGuide()
+        let model = makeModel(service: service, permissionGuide: guide)
+
+        _ = model.perform(action: .leftHalf)
+        _ = model.perform(action: .rightHalf)
+        _ = model.perform(action: .center)
+
+        XCTAssertEqual(guide.startedFrames, [nil])
+    }
+
+    func testOtherFailuresDoNotStartGuide() {
+        let service = FakeWindowActionPerformer(result: .failure(.focusedWindowMissing))
+        let guide = FakePermissionGuide()
+        let model = makeModel(service: service, permissionGuide: guide)
+
+        _ = model.perform(action: .center)
+
+        XCTAssertTrue(guide.startedFrames.isEmpty)
+    }
+
+    func testButtonGuideDoesNotConsumeShortcutThrottle() {
+        let service = FakeWindowActionPerformer(result: .failure(.accessibilityPermissionMissing))
+        let guide = FakePermissionGuide()
+        let model = makeModel(service: service, permission: FakeAccessibilityPermission(isTrusted: false), permissionGuide: guide)
+
+        model.requestAccessibilityPermission()
+        _ = model.perform(action: .leftHalf)
+
+        XCTAssertEqual(guide.startedFrames, [nil, nil])
     }
 
     func testPerformUpdatesWindowManagementErrorForSettingsPresentation() {
@@ -149,6 +185,7 @@ final class WindowManagementModelTests: XCTestCase {
     private func makeModel(
         service: FakeWindowActionPerformer = FakeWindowActionPerformer(),
         permission: FakeAccessibilityPermission = FakeAccessibilityPermission(isTrusted: true),
+        permissionGuide: FakePermissionGuide? = nil,
         settingsOpener: FakeSystemSettingsOpener = FakeSystemSettingsOpener(),
         shortcuts: [WindowShortcut] = WindowShortcutDefaults.all,
         isEnabled: Bool = true
@@ -156,6 +193,7 @@ final class WindowManagementModelTests: XCTestCase {
         WindowManagementModel(
             service: service,
             permissionService: permission,
+            permissionGuide: permissionGuide ?? FakePermissionGuide(),
             settingsOpener: settingsOpener,
             shortcutStore: InMemoryWindowShortcutStore(shortcuts: shortcuts),
             isWindowManagementEnabled: isEnabled
@@ -179,17 +217,12 @@ private final class FakeWindowActionPerformer: WindowActionPerforming {
 
 private final class FakeAccessibilityPermission: AccessibilityPermissionChecking {
     var trusted: Bool
-    var requestPromptCallCount = 0
 
     init(isTrusted: Bool) {
         trusted = isTrusted
     }
 
     var isTrusted: Bool { trusted }
-
-    func requestPrompt() {
-        requestPromptCallCount += 1
-    }
 }
 
 private final class FakeSystemSettingsOpener: SystemSettingsOpening {
@@ -217,5 +250,14 @@ private final class InMemoryWindowShortcutStore: WindowShortcutStoring {
     func saveWindowShortcuts(_ shortcuts: [WindowShortcut]) {
         self.shortcuts = shortcuts
         savedShortcuts.append(shortcuts)
+    }
+}
+
+@MainActor
+private final class FakePermissionGuide: AccessibilityPermissionGuiding {
+    var startedFrames: [CGRect?] = []
+
+    func start(sourceFrame: CGRect?) {
+        startedFrames.append(sourceFrame)
     }
 }

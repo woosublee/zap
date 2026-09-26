@@ -126,10 +126,12 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("private var generalSection: some View"))
         XCTAssertTrue(source.contains("permissionsSection"))
         XCTAssertTrue(source.contains("SettingsCard(title: \"Permissions\")"))
-        XCTAssertTrue(source.contains("Accessibility"))
+        XCTAssertTrue(source.contains("title: AccessibilityPaneName.current"))
+        XCTAssertTrue(source.contains("Drag Zap into the list to let it move and resize windows."))
         XCTAssertTrue(source.contains("Granted"))
-        XCTAssertTrue(source.contains("Button(\"Request\")"))
-        XCTAssertTrue(source.contains("model.windowManagementModel.requestAccessibilityPermission()\n                            refreshAccessibilityPermission()"))
+        XCTAssertTrue(source.contains("Button(\"Grant…\")"))
+        XCTAssertFalse(source.contains("Button(\"Request\")"))
+        XCTAssertTrue(source.contains("model.windowManagementModel.requestAccessibilityPermission(\n                                sourceFrame: PermissionGuideSourceFrame.atMouse\n                            )\n                            refreshAccessibilityPermission()"))
         XCTAssertTrue(source.contains(".onAppear {\n            refreshAccessibilityPermission()\n        }"))
         XCTAssertTrue(source.contains("NSApplication.didBecomeActiveNotification"))
         XCTAssertTrue(source.contains("model.windowManagementModel.refreshAccessibilityPermission()"))
@@ -308,7 +310,8 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("WindowShortcutCategoryGroup"))
         XCTAssertTrue(source.contains("shortcutColumns"))
         XCTAssertTrue(source.contains("isLocked: !model.accessibilityTrusted"))
-        XCTAssertTrue(source.contains("Grant Accessibility in General to enable and run window shortcuts."))
+        XCTAssertTrue(source.contains("Grant \\(AccessibilityPaneName.current) in General to enable and run window shortcuts."))
+        XCTAssertFalse(source.contains("Grant Accessibility in General"))
     }
 
     func testWindowManagementSettingsReceivesAndDisplaysGlobalRegistrationError() throws {

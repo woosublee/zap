@@ -9,7 +9,8 @@ let package = Package(
         .library(name: "ZapCore", targets: ["ZapCore"])
     ],
     dependencies: [
-        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.2")
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.2"),
+        .package(url: "https://github.com/jaywcjlove/PermissionFlow", exact: "2.11.2")
     ],
     targets: [
         .target(
@@ -20,7 +21,8 @@ let package = Package(
             name: "ZapApp",
             dependencies: [
                 "ZapCore",
-                .product(name: "Sparkle", package: "Sparkle")
+                .product(name: "Sparkle", package: "Sparkle"),
+                .product(name: "PermissionFlow", package: "PermissionFlow")
             ],
             path: "Sources/ZapApp",
             linkerSettings: [

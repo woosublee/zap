@@ -1,8 +1,8 @@
 PRODUCT_NAME ?= Zap
 APP_NAME ?= Zap
 BUNDLE_ID ?= com.woosublee.zap
-VERSION ?= 0.1.10
-BUILD_NUMBER ?= 11
+VERSION ?= 0.1.11
+BUILD_NUMBER ?= 12
 BUILD_TAG ?= local-unknown
 BUILD_DIR ?= /tmp/zap-bundles/default
 CONFIGURATION ?= debug
@@ -36,6 +36,7 @@ APP_BUNDLE := $(BUILD_DIR)/$(APP_NAME).app
 CONTENTS_DIR := $(APP_BUNDLE)/Contents
 MACOS_DIR := $(CONTENTS_DIR)/MacOS
 RESOURCES_DIR := $(CONTENTS_DIR)/Resources
+PERMISSION_FLOW_BUNDLE := PermissionFlow_PermissionFlow.bundle
 FRAMEWORKS_DIR := $(CONTENTS_DIR)/Frameworks
 INFO_PLIST := Info.plist
 ENTITLEMENTS := Zap.entitlements
@@ -83,6 +84,10 @@ bundle: swift-build $(INFO_PLIST) $(ENTITLEMENTS)
 	fi
 	test -f "$(MENU_BAR_ICON_FILE)" || { echo "Missing menu bar icon: $(MENU_BAR_ICON_FILE)"; exit 1; }
 	ditto --norsrc --noextattr "$(MENU_BAR_ICON_FILE)" "$(RESOURCES_DIR)/ZapMenuBarIcon.png"
+	build_dir="$$(swift build -c "$(CONFIGURATION)" --show-bin-path)"; \
+	test -d "$$build_dir/$(PERMISSION_FLOW_BUNDLE)" || { echo "Missing $(PERMISSION_FLOW_BUNDLE) under $$build_dir"; exit 1; }; \
+	rm -rf "$(RESOURCES_DIR)/$(PERMISSION_FLOW_BUNDLE)"; \
+	ditto --norsrc --noextattr "$$build_dir/$(PERMISSION_FLOW_BUNDLE)" "$(RESOURCES_DIR)/$(PERMISSION_FLOW_BUNDLE)"
 	chmod +x "$(MACOS_DIR)/$(APP_NAME)"
 	xattr -r -c "$(APP_BUNDLE)"
 	@echo "Bundled $(APP_BUNDLE)"
@@ -124,6 +129,7 @@ verify: sign
 	plutil -extract ZapBuildTag raw "$(APP_BUNDLE)/Contents/Info.plist" | grep -Fx "$(BUILD_TAG)" >/dev/null
 	test -f "$(RESOURCES_DIR)/$(ICON_NAME).icns"
 	test -f "$(RESOURCES_DIR)/ZapMenuBarIcon.png"
+	test -d "$(RESOURCES_DIR)/$(PERMISSION_FLOW_BUNDLE)"
 	test -d "$(FRAMEWORKS_DIR)/Sparkle.framework"
 	codesign --verify --strict --verbose=2 "$(FRAMEWORKS_DIR)/Sparkle.framework"
 	otool -l "$(MACOS_DIR)/$(APP_NAME)" | grep -A2 LC_RPATH | grep -F "@executable_path/../Frameworks" >/dev/null

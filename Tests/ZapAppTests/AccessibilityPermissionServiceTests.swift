@@ -8,20 +8,10 @@ final class AccessibilityPermissionServiceTests: XCTestCase {
 
         XCTAssertTrue(service.isTrusted)
     }
-
-    func testRequestPromptAsksAXClientToShowPrompt() {
-        let client = MockAXPermissionClient(isTrusted: false)
-        let service = AccessibilityPermissionService(client: client)
-
-        service.requestPrompt()
-
-        XCTAssertEqual(client.requestedPromptValues, [true])
-    }
 }
 
 private final class MockAXPermissionClient: AXPermissionClienting {
     var trusted: Bool
-    var requestedPromptValues: [Bool] = []
 
     init(isTrusted: Bool) {
         trusted = isTrusted
@@ -29,9 +19,5 @@ private final class MockAXPermissionClient: AXPermissionClienting {
 
     var isTrusted: Bool {
         trusted
-    }
-
-    func requestPrompt(showPrompt: Bool) {
-        requestedPromptValues.append(showPrompt)
     }
 }

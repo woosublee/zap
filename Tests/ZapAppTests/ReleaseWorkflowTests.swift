@@ -143,6 +143,14 @@ final class ReleaseWorkflowTests: XCTestCase {
         XCTAssertLessThan(firstRange.lowerBound, secondRange.lowerBound)
     }
 
+    func testBundleEmbedsPermissionFlowResources() throws {
+        let makefile = try String(contentsOf: repositoryRoot().appendingPathComponent("Makefile"), encoding: .utf8)
+
+        XCTAssertTrue(makefile.contains("PERMISSION_FLOW_BUNDLE := PermissionFlow_PermissionFlow.bundle"))
+        XCTAssertTrue(makefile.contains("ditto --norsrc --noextattr \"$$build_dir/$(PERMISSION_FLOW_BUNDLE)\" \"$(RESOURCES_DIR)/$(PERMISSION_FLOW_BUNDLE)\""))
+        XCTAssertTrue(makefile.contains("test -d \"$(RESOURCES_DIR)/$(PERMISSION_FLOW_BUNDLE)\""))
+    }
+
     private func repositoryRoot() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
