@@ -45,7 +45,6 @@ final class ShortcutHUDScreenResolverTests: XCTestCase {
 
         XCTAssertEqual(resolver.resolveScreenBeforeAction(), right)
         XCTAssertEqual(windows.frontmostWindowCallCount, 0)
-        XCTAssertEqual(permission.requestPromptCallCount, 0)
     }
 
     func testAXFailureFallsBackToMouseThenPrimary() {
@@ -85,14 +84,9 @@ final class ShortcutHUDScreenResolverTests: XCTestCase {
 
 private final class StubHUDPermission: AccessibilityPermissionChecking {
     let isTrusted: Bool
-    private(set) var requestPromptCallCount = 0
 
     init(isTrusted: Bool) {
         self.isTrusted = isTrusted
-    }
-
-    func requestPrompt() {
-        requestPromptCallCount += 1
     }
 }
 

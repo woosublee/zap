@@ -87,7 +87,6 @@ final class WindowManagementModelTests: XCTestCase {
         model.requestAccessibilityPermission(sourceFrame: frame)
         model.requestAccessibilityPermission(sourceFrame: frame)
         XCTAssertEqual(guide.startedFrames, [frame, frame])
-        XCTAssertEqual(permission.requestPromptCallCount, 0)
 
         permission.trusted = true
         model.refreshAccessibilityPermission()
@@ -218,17 +217,12 @@ private final class FakeWindowActionPerformer: WindowActionPerforming {
 
 private final class FakeAccessibilityPermission: AccessibilityPermissionChecking {
     var trusted: Bool
-    var requestPromptCallCount = 0
 
     init(isTrusted: Bool) {
         trusted = isTrusted
     }
 
     var isTrusted: Bool { trusted }
-
-    func requestPrompt() {
-        requestPromptCallCount += 1
-    }
 }
 
 private final class FakeSystemSettingsOpener: SystemSettingsOpening {

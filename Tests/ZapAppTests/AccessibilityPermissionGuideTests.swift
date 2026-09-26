@@ -33,6 +33,4 @@ final class AccessibilityPermissionGuideTests: XCTestCase {
 
 private struct StubGuidePermission: AccessibilityPermissionChecking {
     let isTrusted: Bool
-
-    func requestPrompt() {}
 }

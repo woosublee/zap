@@ -436,8 +436,6 @@ private final class MockAccessibilityPermission: AccessibilityPermissionChecking
     var isTrusted: Bool {
         trusted
     }
-
-    func requestPrompt() {}
 }
 
 private final class MockAccessibilityWindows: AccessibilityWindowControlling {
