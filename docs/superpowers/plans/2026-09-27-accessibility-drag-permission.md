@@ -720,7 +720,7 @@ Reset the permission again (Step 2) and relaunch. Press a window shortcut (defau
 
 - [ ] **Step 5: Localized panel strings**
 
-With the panel open, confirm its text is localized (e.g. Korean on a Korean system), not raw keys like `permission_flow.…`. Raw keys mean the resource bundle was not found — revisit Task 2 Step 7/8.
+With the panel open on a non-English system (e.g. Korean), confirm its text is in that language. When the resource bundle is missing, PermissionFlow falls back to its built-in English defaults rather than showing raw keys, so English text on a Korean system means `PermissionFlowResources.packageBundle` is nil — check that `Contents/Resources/PermissionFlow_PermissionFlow.bundle` exists in the built app and revisit Task 2 Step 7/8.
 
 - [ ] **Step 6: Report**
 
