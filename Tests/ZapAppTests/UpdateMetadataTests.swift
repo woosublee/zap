@@ -25,12 +25,16 @@ final class UpdateMetadataTests: XCTestCase {
         XCTAssertTrue(makefile.contains("plutil -replace ZapBuildTag -string \"$(BUILD_TAG)\""))
     }
 
-    func testMakefileUsesZapSigningIdentityForEveryBuild() throws {
+    func testMakefileUsesDeveloperIDSigningIdentityForEveryBuild() throws {
         let makefile = try loadMakefile()
 
-        XCTAssertTrue(makefile.contains("CODESIGN_IDENTITY ?= zap"))
+        XCTAssertTrue(makefile.contains("CODESIGN_IDENTITY ?= Developer ID Application: Woosub Lee (2L6ZW98RCP)"))
         XCTAssertTrue(makefile.contains("RELEASE_CODESIGN_IDENTITY ?= $(CODESIGN_IDENTITY)"))
-        XCTAssertTrue(makefile.contains("LOCAL_CERTIFICATE_IDENTITY ?= $(CODESIGN_IDENTITY)"))
+        XCTAssertTrue(makefile.contains("RELEASE_CODESIGN_OPTIONS ?= --options runtime --timestamp"))
+        XCTAssertTrue(makefile.contains("CODESIGN_IDENTITY=\"$(RELEASE_CODESIGN_IDENTITY)\" CODESIGN_OPTIONS=\"$(RELEASE_CODESIGN_OPTIONS)\""))
+        XCTAssertFalse(makefile.contains("CODESIGN_IDENTITY ?= zap"))
+        XCTAssertFalse(makefile.contains("create-local-certificate"))
+        XCTAssertFalse(makefile.contains("LOCAL_CERTIFICATE_IDENTITY"))
         XCTAssertTrue(makefile.contains("dev-build:\n\t$(MAKE) sign APP_NAME=\"$(DEV_APP_NAME)\" BUNDLE_ID=\"$(DEV_BUNDLE_ID)\" BUILD_DIR=\"$(DEV_BUILD_DIR)\""))
         XCTAssertFalse(makefile.contains("CODESIGN_IDENTITY=\"-\""))
     }
@@ -46,7 +50,7 @@ final class UpdateMetadataTests: XCTestCase {
         let makefile = try loadMakefile()
 
         XCTAssertFalse(makefile.contains("@if [ \"$(CODESIGN_IDENTITY)\" != \"-\" ]; then"))
-        XCTAssertTrue(makefile.contains("codesign --force $(CODESIGN_OPTIONS) --sign \"$(CODESIGN_IDENTITY)\" \"$$item\""))
+        XCTAssertTrue(makefile.contains("codesign --force $(CODESIGN_OPTIONS) --preserve-metadata=entitlements --sign \"$(CODESIGN_IDENTITY)\" \"$$item\""))
         XCTAssertTrue(makefile.contains("codesign --force $(CODESIGN_OPTIONS) --sign \"$(CODESIGN_IDENTITY)\" \"$(FRAMEWORKS_DIR)/Sparkle.framework\""))
     }
 
@@ -57,6 +61,13 @@ final class UpdateMetadataTests: XCTestCase {
         XCTAssertFalse(makefile.contains("bundle: swift-build embed-sparkle $(INFO_PLIST) $(ENTITLEMENTS)"))
         XCTAssertTrue(makefile.contains("rm -rf \"$(APP_BUNDLE)\""))
         XCTAssertTrue(makefile.contains("$(MAKE) embed-sparkle CONFIGURATION=\"$(CONFIGURATION)\" BUILD_DIR=\"$(BUILD_DIR)\""))
+    }
+
+    func testEntitlementsAllowSendingAppleEventsUnderHardenedRuntime() throws {
+        let data = try Data(contentsOf: packageRootURL.appendingPathComponent("Zap.entitlements"))
+        let plist = try XCTUnwrap(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+
+        XCTAssertEqual(plist["com.apple.security.automation.apple-events"] as? Bool, true)
     }
 
     func testMakefileUsesSimpleTrapSyntax() throws {

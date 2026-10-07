@@ -6,12 +6,14 @@ fail() {
   exit 1
 }
 
-CODESIGN_IDENTITY="zap"
-CERTIFICATE_SECRET="${CERTIFICATE_SECRET:-ZAP_CERTIFICATE_BASE64}"
-CERTIFICATE_PASSWORD_SECRET="${CERTIFICATE_PASSWORD_SECRET:-ZAP_CERTIFICATE_PASSWORD}"
+CERTIFICATE_SECRET="${CERTIFICATE_SECRET:-DEVELOPER_ID_CERTIFICATE_BASE64}"
+CERTIFICATE_PASSWORD_SECRET="${CERTIFICATE_PASSWORD_SECRET:-DEVELOPER_ID_CERTIFICATE_PASSWORD}"
 SPARKLE_SECRET="${SPARKLE_SECRET:-SPARKLE_PRIVATE_KEY}"
 SPARKLE_KEYCHAIN_SERVICE="${SPARKLE_KEYCHAIN_SERVICE:-https://sparkle-project.org}"
 SPARKLE_KEYCHAIN_ACCOUNT="${SPARKLE_KEYCHAIN_ACCOUNT:-com.woosublee.Zap.sparkle.ed25519}"
+# Secrets for the retired self-signed "zap" certificate. They are deleted once
+# the Developer ID secrets are registered.
+LEGACY_CERTIFICATE_SECRETS=(ZAP_CERTIFICATE_BASE64 ZAP_CERTIFICATE_PASSWORD)
 
 if ! command -v gh >/dev/null 2>&1; then
   fail "gh CLI is required"
@@ -21,94 +23,84 @@ if ! gh auth status >/dev/null 2>&1; then
   fail "gh CLI is not authenticated"
 fi
 
+[[ -n "${DEVELOPER_ID_CERTIFICATE_P12:-}" ]] || fail "DEVELOPER_ID_CERTIFICATE_P12 must point at the exported Developer ID Application .p12"
+[[ -f "$DEVELOPER_ID_CERTIFICATE_P12" ]] || fail "DEVELOPER_ID_CERTIFICATE_P12 does not exist: $DEVELOPER_ID_CERTIFICATE_P12"
+[[ -n "${DEVELOPER_ID_CERTIFICATE_PASSWORD:-}" ]] || fail "DEVELOPER_ID_CERTIFICATE_PASSWORD is required"
+[[ -n "${ASC_ISSUER_ID:-}" ]] || fail "ASC_ISSUER_ID is required (App Store Connect > Users and Access > Integrations)"
+
+if [[ -z "${ASC_KEY_PATH:-}" ]]; then
+  shopt -s nullglob
+  asc_keys=("$HOME"/.appstoreconnect/private_keys/AuthKey_*.p8)
+  shopt -u nullglob
+  [[ ${#asc_keys[@]} -eq 1 ]] || fail "Set ASC_KEY_PATH; found ${#asc_keys[@]} keys under ~/.appstoreconnect/private_keys"
+  ASC_KEY_PATH="${asc_keys[0]}"
+fi
+[[ -f "$ASC_KEY_PATH" ]] || fail "ASC_KEY_PATH does not exist: $ASC_KEY_PATH"
+if [[ -z "${ASC_KEY_ID:-}" ]]; then
+  ASC_KEY_ID="$(basename "$ASC_KEY_PATH" .p8)"
+  ASC_KEY_ID="${ASC_KEY_ID#AuthKey_}"
+fi
+
 REPOSITORY="${REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
+
 existing_secrets="$(gh secret list --repo "$REPOSITORY" --json name --jq '.[].name')"
-if printf '%s\n' "$existing_secrets" | grep -Eq "^(${CERTIFICATE_SECRET}|${CERTIFICATE_PASSWORD_SECRET})$"; then
-  if [[ "${ZAP_ROTATE_CERTIFICATE:-}" != "1" ]]; then
-    fail "${CERTIFICATE_SECRET} or ${CERTIFICATE_PASSWORD_SECRET} already exists for ${REPOSITORY}. Set ZAP_ROTATE_CERTIFICATE=1 only if you intentionally want to rotate the CI signing certificate."
-  fi
-fi
 
-if ! make -s check-eddsa-key >/dev/null; then
-  fail "Sparkle private key is missing or does not match Info.plist. Run make generate-eddsa-key and keep Info.plist SUPublicEDKey in sync."
+# The Sparkle key must never change, so an already registered secret is kept
+# when this machine does not hold the key.
+sparkle_private_key=""
+if make -s check-eddsa-key >/dev/null 2>&1; then
+  sparkle_private_key="$(security find-generic-password -s "$SPARKLE_KEYCHAIN_SERVICE" -a "$SPARKLE_KEYCHAIN_ACCOUNT" -w 2>/dev/null)" || \
+    fail "Sparkle private key is missing from Keychain: service=$SPARKLE_KEYCHAIN_SERVICE account=$SPARKLE_KEYCHAIN_ACCOUNT"
+elif ! printf '%s\n' "$existing_secrets" | grep -Fxq "$SPARKLE_SECRET"; then
+  fail "Sparkle private key is missing or does not match Info.plist, and ${SPARKLE_SECRET} is not registered. Import the existing key; do not generate a new one."
 fi
-
-sparkle_private_key="$(security find-generic-password -s "$SPARKLE_KEYCHAIN_SERVICE" -a "$SPARKLE_KEYCHAIN_ACCOUNT" -w 2>/dev/null)" || \
-  fail "Sparkle private key is missing from Keychain: service=$SPARKLE_KEYCHAIN_SERVICE account=$SPARKLE_KEYCHAIN_ACCOUNT"
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 certificate_password_file="$tmpdir/certificate-password.txt"
-if [[ -n "${ZAP_CERTIFICATE_PASSWORD:-}" ]]; then
-  printf '%s' "$ZAP_CERTIFICATE_PASSWORD" > "$certificate_password_file"
-else
-  openssl rand -base64 24 > "$certificate_password_file"
-fi
-certificate_password="$(cat "$certificate_password_file")"
+printf '%s' "$DEVELOPER_ID_CERTIFICATE_PASSWORD" > "$certificate_password_file"
 
-legacy_args=()
-if openssl pkcs12 -help 2>&1 | grep -q -- '-legacy'; then
-  legacy_args=(-legacy)
-fi
-
-if [[ -n "${ZAP_CERTIFICATE_P12:-}" ]]; then
-  [[ -f "$ZAP_CERTIFICATE_P12" ]] || fail "ZAP_CERTIFICATE_P12 does not exist: $ZAP_CERTIFICATE_P12"
-  [[ -n "${ZAP_CERTIFICATE_PASSWORD:-}" ]] || fail "ZAP_CERTIFICATE_PASSWORD is required when ZAP_CERTIFICATE_P12 is set"
-  certificate_path="$ZAP_CERTIFICATE_P12"
-else
-  openssl_config="$tmpdir/openssl.cnf"
-  certificate_key="$tmpdir/${CODESIGN_IDENTITY}.key"
-  certificate_crt="$tmpdir/${CODESIGN_IDENTITY}.crt"
-  certificate_path="$tmpdir/${CODESIGN_IDENTITY}.p12"
-
-  cat > "$openssl_config" <<EOF
-[req]
-distinguished_name = req_distinguished_name
-x509_extensions = v3_req
-prompt = no
-[req_distinguished_name]
-CN = ${CODESIGN_IDENTITY}
-[v3_req]
-basicConstraints = critical,CA:false
-keyUsage = critical,digitalSignature
-extendedKeyUsage = critical,codeSigning
-EOF
-
-  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-    -keyout "$certificate_key" \
-    -out "$certificate_crt" \
-    -config "$openssl_config" \
-    >/dev/null 2>&1
-
-  openssl pkcs12 "${legacy_args[@]}" -export \
-    -passout "file:${certificate_password_file}" \
-    -inkey "$certificate_key" \
-    -in "$certificate_crt" \
-    -out "$certificate_path" \
-    -name "$CODESIGN_IDENTITY" \
-    >/dev/null 2>&1
+# Keychain exports use legacy ciphers: OpenSSL 3 needs -legacy to read the key,
+# while LibreSSL has no -legacy flag but reads it directly.
+pkcs12_dump() {
+  openssl pkcs12 "$@" -in "$DEVELOPER_ID_CERTIFICATE_P12" -passin "file:${certificate_password_file}" -nodes 2>/dev/null || true
+}
+private_key_pattern='BEGIN ([A-Z]+ )?PRIVATE KEY'
+pkcs12_contents="$(pkcs12_dump)"
+if ! grep -Eq "$private_key_pattern" <<<"$pkcs12_contents"; then
+  pkcs12_contents="$(pkcs12_dump -legacy)"
 fi
 
-certificate_subject="$(openssl pkcs12 "${legacy_args[@]}" -in "$certificate_path" -passin "file:${certificate_password_file}" -clcerts -nokeys 2>/dev/null | openssl x509 -noout -subject 2>/dev/null)" || \
+grep -Eq "$private_key_pattern" <<<"$pkcs12_contents" || \
+  fail ".p12 must contain the Developer ID Application private key, and DEVELOPER_ID_CERTIFICATE_PASSWORD must open it"
+
+certificate_subject="$(openssl x509 -noout -subject <<<"$pkcs12_contents" 2>/dev/null)" || \
   fail "Unable to read certificate from .p12"
 case "$certificate_subject" in
-  *"CN = ${CODESIGN_IDENTITY}"*|*"CN=${CODESIGN_IDENTITY}"*) ;;
-  *) fail ".p12 certificate common name must be ${CODESIGN_IDENTITY}; got: ${certificate_subject}" ;;
+  *"Developer ID Application"*) ;;
+  *) fail ".p12 must contain a Developer ID Application certificate; got: ${certificate_subject}" ;;
 esac
 
-if ! openssl pkcs12 "${legacy_args[@]}" -in "$certificate_path" -passin "file:${certificate_password_file}" -nocerts -nodes 2>/dev/null | grep -Eq 'BEGIN (RSA |EC |)PRIVATE KEY'; then
-  fail ".p12 must contain a private key for ${CODESIGN_IDENTITY}"
+base64 < "$DEVELOPER_ID_CERTIFICATE_P12" | tr -d '\n' | gh secret set "$CERTIFICATE_SECRET" --repo "$REPOSITORY"
+printf '%s' "$DEVELOPER_ID_CERTIFICATE_PASSWORD" | gh secret set "$CERTIFICATE_PASSWORD_SECRET" --repo "$REPOSITORY"
+printf '%s' "$ASC_KEY_ID" | gh secret set ASC_KEY_ID --repo "$REPOSITORY"
+printf '%s' "$ASC_ISSUER_ID" | gh secret set ASC_ISSUER_ID --repo "$REPOSITORY"
+base64 < "$ASC_KEY_PATH" | tr -d '\n' | gh secret set ASC_KEY_P8_BASE64 --repo "$REPOSITORY"
+if [[ -n "$sparkle_private_key" ]]; then
+  printf '%s' "$sparkle_private_key" | gh secret set "$SPARKLE_SECRET" --repo "$REPOSITORY"
+else
+  printf 'Kept the registered %s secret; the Sparkle key is not in this Keychain.\n' "$SPARKLE_SECRET"
 fi
 
-base64_certificate="$(base64 < "$certificate_path" | tr -d '\n')"
-
-printf '%s' "$base64_certificate" | gh secret set "$CERTIFICATE_SECRET" --repo "$REPOSITORY"
-printf '%s' "$certificate_password" | gh secret set "$CERTIFICATE_PASSWORD_SECRET" --repo "$REPOSITORY"
-printf '%s' "$sparkle_private_key" | gh secret set "$SPARKLE_SECRET" --repo "$REPOSITORY"
-
-printf 'Registered GitHub secrets for %s: %s, %s, %s\n' \
+printf 'Registered GitHub secrets for %s: %s, %s, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64\n' \
   "$REPOSITORY" \
   "$CERTIFICATE_SECRET" \
-  "$CERTIFICATE_PASSWORD_SECRET" \
-  "$SPARKLE_SECRET"
+  "$CERTIFICATE_PASSWORD_SECRET"
+
+for legacy_secret in "${LEGACY_CERTIFICATE_SECRETS[@]}"; do
+  if printf '%s\n' "$existing_secrets" | grep -Fxq "$legacy_secret"; then
+    gh secret delete "$legacy_secret" --repo "$REPOSITORY"
+    printf 'Deleted retired self-signed certificate secret: %s\n' "$legacy_secret"
+  fi
+done
