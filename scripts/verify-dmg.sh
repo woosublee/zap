@@ -42,4 +42,10 @@ app_path="$mount_dir/${app_name}.app"
   exit 1
 }
 codesign --verify --deep --strict --verbose=2 "$app_path"
+if [[ "${VERIFY_GATEKEEPER:-}" == "1" ]]; then
+  spctl -a -vv -t open --context context:primary-signature "$dmg_path"
+  xcrun stapler validate "$dmg_path"
+  xcrun stapler validate "$app_path"
+  spctl -a -vv -t exec "$app_path"
+fi
 echo "DMG verification passed"

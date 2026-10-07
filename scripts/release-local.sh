@@ -19,8 +19,9 @@ BUILD_NUMBER="$(make -s print-build-number)"
 BUILD_TAG="$(make -s print-build-tag)"
 APPCAST_PATH="dist/appcast.xml"
 DMG_PATH="dist/Zap-${VERSION}.dmg"
-CODESIGN_IDENTITY="zap"
-RELEASE_NOTES="Manual fallback release: self-signed, non-notarized DMG signed with the local zap code signing identity and Sparkle appcast."
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Woosub Lee (2L6ZW98RCP)}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-woosublee-notary}"
+RELEASE_NOTES="Manual fallback release: Developer ID signed and notarized DMG with Sparkle appcast."
 
 [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "RELEASE_TAG must use semantic versioning, for example v0.1.0"
 [[ "$RELEASE_TAG" == "$BUILD_TAG" ]] || fail "RELEASE_TAG $RELEASE_TAG must match Makefile build tag $BUILD_TAG"
@@ -28,13 +29,17 @@ RELEASE_NOTES="Manual fallback release: self-signed, non-notarized DMG signed wi
 [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || fail "Build number must be a positive integer: $BUILD_NUMBER"
 
 if ! security find-identity -v -p codesigning | grep -F "\"${CODESIGN_IDENTITY}\"" >/dev/null; then
-  fail "${CODESIGN_IDENTITY} code signing identity is required. Confirm it exists with: security find-identity -v -p codesigning. This script does not create Keychain certificates automatically."
+  fail "${CODESIGN_IDENTITY} code signing identity is required. Confirm it exists with: security find-identity -v -p codesigning."
+fi
+
+if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+  fail "notarytool keychain profile ${NOTARY_PROFILE} is required. Create it with: xcrun notarytool store-credentials ${NOTARY_PROFILE} --key <AuthKey.p8> --key-id <ASC_KEY_ID> --issuer <ASC_ISSUER_ID>"
 fi
 
 REPOSITORY="${REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
 export RELEASE_TAG VERSION BUILD_NUMBER APPCAST_PATH DMG_PATH REPOSITORY
 
-make VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUILD_TAG="$RELEASE_TAG" CODESIGN_IDENTITY="$CODESIGN_IDENTITY" prepare-release-dmg
+make VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" BUILD_TAG="$RELEASE_TAG" CODESIGN_IDENTITY="$CODESIGN_IDENTITY" NOTARY_PROFILE="$NOTARY_PROFILE" prepare-release-dmg
 make -s check-eddsa-key
 scripts/generate-sparkle-appcast.sh
 

@@ -6,10 +6,12 @@ BUILD_NUMBER ?= 12
 BUILD_TAG ?= local-unknown
 BUILD_DIR ?= /tmp/zap-bundles/default
 CONFIGURATION ?= debug
-CODESIGN_IDENTITY ?= zap
+CODESIGN_IDENTITY ?= Developer ID Application: Woosub Lee (2L6ZW98RCP)
 RELEASE_CODESIGN_IDENTITY ?= $(CODESIGN_IDENTITY)
 CODESIGN_OPTIONS ?=
-LOCAL_CERTIFICATE_IDENTITY ?= $(CODESIGN_IDENTITY)
+RELEASE_CODESIGN_OPTIONS ?= --options runtime --timestamp
+NOTARY_PROFILE ?= woosublee-notary
+NOTARY_KEYCHAIN ?=
 DIST_DIR ?= dist
 SPARKLE_TOOLS_DIR ?= .sparkle-tools
 SPARKLE_VERSION ?= 2.9.2
@@ -42,8 +44,9 @@ INFO_PLIST := Info.plist
 ENTITLEMENTS := Zap.entitlements
 RELEASE_ARCHIVE := $(DIST_DIR)/$(APP_NAME)-$(VERSION).zip
 RELEASE_DMG := $(DIST_DIR)/$(APP_NAME)-$(VERSION).dmg
+PROD_APP_BUNDLE := $(PROD_BUILD_DIR)/$(PROD_APP_NAME).app
 
-.PHONY: all print-app-version print-build-number print-build-tag swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean create-local-certificate check-local-certificate generate-eddsa-key check-eddsa-key require-release-build-tag release-archive release-dmg verify-dmg sign-dmg prepare-release-dmg appcast release
+.PHONY: all print-app-version print-build-number print-build-tag swift-build bundle embed-sparkle sign verify run install install-and-run dev-build dev-verify dev-run prod-build prod-verify prod-run prod-install prod-install-and-run test clean distclean check-codesign-identity generate-eddsa-key check-eddsa-key require-release-build-tag notarize-app release-archive release-dmg verify-dmg sign-dmg notarize-dmg verify-notarized-dmg prepare-release-dmg appcast release
 
 all: sign
 
@@ -115,7 +118,7 @@ sign: bundle
 		"$(FRAMEWORKS_DIR)/Sparkle.framework/Autoupdate" \
 		"$(FRAMEWORKS_DIR)/Sparkle.framework/Updater.app"; do \
 		if [ -e "$$item" ]; then \
-			codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$$item"; \
+			codesign --force $(CODESIGN_OPTIONS) --preserve-metadata=entitlements --sign "$(CODESIGN_IDENTITY)" "$$item"; \
 		fi; \
 	done
 	codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" "$(FRAMEWORKS_DIR)/Sparkle.framework"
@@ -135,50 +138,12 @@ verify: sign
 	otool -l "$(MACOS_DIR)/$(APP_NAME)" | grep -A2 LC_RPATH | grep -F "@executable_path/../Frameworks" >/dev/null
 	@echo "verification passed"
 
-create-local-certificate:
-	@if security find-certificate -c "$(LOCAL_CERTIFICATE_IDENTITY)" >/dev/null; then \
-		echo "Reusing existing code signing certificate: $(LOCAL_CERTIFICATE_IDENTITY)"; \
-	else \
-		tmpdir="$$(mktemp -d)"; \
-		trap 'rm -rf "$$tmpdir"' EXIT; \
-		printf '%s\n' \
-			'[req]' \
-			'distinguished_name = req_distinguished_name' \
-			'x509_extensions = v3_req' \
-			'prompt = no' \
-			'[req_distinguished_name]' \
-			'CN = $(LOCAL_CERTIFICATE_IDENTITY)' \
-			'[v3_req]' \
-			'basicConstraints = critical,CA:false' \
-			'keyUsage = critical,digitalSignature' \
-			'extendedKeyUsage = critical,codeSigning' \
-			> "$$tmpdir/openssl.cnf"; \
-		openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-			-keyout "$$tmpdir/$(LOCAL_CERTIFICATE_IDENTITY).key" \
-			-out "$$tmpdir/$(LOCAL_CERTIFICATE_IDENTITY).crt" \
-			-config "$$tmpdir/openssl.cnf"; \
-		p12_password="zap-local-temporary-import-password"; \
-		openssl pkcs12 -legacy -export -passout pass:$$p12_password \
-			-inkey "$$tmpdir/$(LOCAL_CERTIFICATE_IDENTITY).key" \
-			-in "$$tmpdir/$(LOCAL_CERTIFICATE_IDENTITY).crt" \
-			-out "$$tmpdir/$(LOCAL_CERTIFICATE_IDENTITY).p12" \
-			-name "$(LOCAL_CERTIFICATE_IDENTITY)"; \
-		keychain="$$(security default-keychain | sed 's/^ *//; s/"//g')"; \
-		security import "$$tmpdir/$(LOCAL_CERTIFICATE_IDENTITY).p12" -k "$$keychain" -P "$$p12_password" -T /usr/bin/codesign; \
-		security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$$keychain" >/dev/null 2>&1 || true; \
-	fi
-	$(MAKE) check-local-certificate
-
-check-local-certificate:
-	@security find-certificate -c "$(LOCAL_CERTIFICATE_IDENTITY)" >/dev/null
-	@tmpdir="$$(mktemp -d)"; \
-	trap 'rm -rf "$$tmpdir"' EXIT; \
-	probe="$$tmpdir/probe"; \
-	printf '#!/bin/sh\nexit 0\n' > "$$probe"; \
-	chmod +x "$$probe"; \
-	codesign --force --sign "$(LOCAL_CERTIFICATE_IDENTITY)" "$$probe"; \
-	codesign --verify --strict --verbose=2 "$$probe"; \
-	echo "Code signing identity works: $(LOCAL_CERTIFICATE_IDENTITY)"
+check-codesign-identity:
+	@security find-identity -v -p codesigning | grep -F -- "$(RELEASE_CODESIGN_IDENTITY)" >/dev/null || { \
+		echo "Missing code signing identity: $(RELEASE_CODESIGN_IDENTITY)"; \
+		exit 1; \
+	}
+	@echo "Code signing identity found: $(RELEASE_CODESIGN_IDENTITY)"
 
 sparkle-tools: $(SPARKLE_TOOLS_STAMP)
 
@@ -215,16 +180,28 @@ require-release-build-tag:
 		exit 1; \
 	}
 
+# Notarizes the signed production app and staples the ticket so the DMG and
+# Sparkle updates carry an app that passes Gatekeeper offline.
+notarize-app:
+	test -d "$(PROD_APP_BUNDLE)" || { echo "Missing app: $(PROD_APP_BUNDLE)"; exit 1; }
+	@tmpdir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	ditto -c -k --keepParent "$(PROD_APP_BUNDLE)" "$$tmpdir/$(PROD_APP_NAME)-notarize.zip"; \
+	NOTARY_PROFILE="$(NOTARY_PROFILE)" NOTARY_KEYCHAIN="$(NOTARY_KEYCHAIN)" scripts/notarize.sh "$$tmpdir/$(PROD_APP_NAME)-notarize.zip"
+	xcrun stapler staple "$(PROD_APP_BUNDLE)"
+	xcrun stapler validate "$(PROD_APP_BUNDLE)"
+
 release-archive: require-release-build-tag prod-verify
 	rm -rf "$(DIST_DIR)"
 	mkdir -p "$(DIST_DIR)"
-	ditto -c -k --keepParent "$(PROD_BUILD_DIR)/$(PROD_APP_NAME).app" "$(RELEASE_ARCHIVE)"
+	$(MAKE) notarize-app
+	ditto -c -k --keepParent "$(PROD_APP_BUNDLE)" "$(RELEASE_ARCHIVE)"
 	@echo "Created $(RELEASE_ARCHIVE)"
 
 release-dmg: release-archive
 	mkdir -p "$(DIST_DIR)"
 	rm -f "$(RELEASE_DMG)"
-	hdiutil create -volname "$(APP_NAME) $(VERSION)" -srcfolder "$(PROD_BUILD_DIR)/$(PROD_APP_NAME).app" -ov -format UDZO "$(RELEASE_DMG)"
+	hdiutil create -volname "$(APP_NAME) $(VERSION)" -srcfolder "$(PROD_APP_BUNDLE)" -ov -format UDZO "$(RELEASE_DMG)"
 	hdiutil verify "$(RELEASE_DMG)"
 	@echo "Created $(RELEASE_DMG)"
 
@@ -232,21 +209,34 @@ verify-dmg:
 	test -f "$(RELEASE_DMG)"
 	APP_NAME="$(PROD_APP_NAME)" scripts/verify-dmg.sh "$(RELEASE_DMG)"
 
+verify-notarized-dmg:
+	test -f "$(RELEASE_DMG)"
+	VERIFY_GATEKEEPER=1 APP_NAME="$(PROD_APP_NAME)" scripts/verify-dmg.sh "$(RELEASE_DMG)"
+
 sign-dmg:
 	test -f "$(RELEASE_DMG)" || { echo "Missing DMG: $(RELEASE_DMG)"; exit 1; }
-	codesign --force --sign "$(CODESIGN_IDENTITY)" "$(RELEASE_DMG)"
+	codesign --force --timestamp --sign "$(CODESIGN_IDENTITY)" "$(RELEASE_DMG)"
 	@echo "Signed $(RELEASE_DMG)"
 
+notarize-dmg:
+	test -f "$(RELEASE_DMG)" || { echo "Missing DMG: $(RELEASE_DMG)"; exit 1; }
+	NOTARY_PROFILE="$(NOTARY_PROFILE)" NOTARY_KEYCHAIN="$(NOTARY_KEYCHAIN)" scripts/notarize.sh "$(RELEASE_DMG)"
+	xcrun stapler staple "$(RELEASE_DMG)"
+	xcrun stapler validate "$(RELEASE_DMG)"
+	@echo "Notarized $(RELEASE_DMG)"
+
+# Sparkle signs the DMG bytes, so the appcast must be generated after stapling.
 prepare-release-dmg: release-dmg
 	$(MAKE) verify-dmg
-	$(MAKE) sign-dmg CODESIGN_IDENTITY="$(CODESIGN_IDENTITY)"
-	$(MAKE) verify-dmg
+	$(MAKE) sign-dmg CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)"
+	$(MAKE) notarize-dmg
+	$(MAKE) verify-notarized-dmg
 
 appcast: prepare-release-dmg check-eddsa-key $(SPARKLE_TOOLS_STAMP)
 	RELEASE_TAG="v$(VERSION)" VERSION="$(VERSION)" BUILD_NUMBER="$(BUILD_NUMBER)" DMG_PATH="$(RELEASE_DMG)" APPCAST_PATH="$(DIST_DIR)/appcast.xml" REPOSITORY="$(REPOSITORY)" SPARKLE_SIGN_UPDATE="$(SPARKLE_SIGN_UPDATE)" scripts/generate-sparkle-appcast.sh
 	@echo "Created $(DIST_DIR)/appcast.xml"
 
-release: create-local-certificate appcast
+release: check-codesign-identity appcast
 	@echo "Release archive: $(RELEASE_ARCHIVE)"
 	@echo "Release DMG: $(RELEASE_DMG)"
 	@echo "Appcast: $(DIST_DIR)/appcast.xml"
@@ -262,19 +252,19 @@ dev-run:
 	$(MAKE) run APP_NAME="$(DEV_APP_NAME)" BUNDLE_ID="$(DEV_BUNDLE_ID)" BUILD_DIR="$(DEV_BUILD_DIR)"
 
 prod-build:
-	$(MAKE) sign APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
+	$(MAKE) sign APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(RELEASE_CODESIGN_OPTIONS)"
 
 prod-verify:
-	$(MAKE) verify APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
+	$(MAKE) verify APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(RELEASE_CODESIGN_OPTIONS)"
 
 prod-run:
-	$(MAKE) run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
+	$(MAKE) run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(RELEASE_CODESIGN_OPTIONS)"
 
 prod-install:
-	$(MAKE) install APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
+	$(MAKE) install APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(RELEASE_CODESIGN_OPTIONS)"
 
 prod-install-and-run:
-	$(MAKE) install-and-run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(CODESIGN_OPTIONS)"
+	$(MAKE) install-and-run APP_NAME="$(PROD_APP_NAME)" BUNDLE_ID="$(PROD_BUNDLE_ID)" BUILD_DIR="$(PROD_BUILD_DIR)" CONFIGURATION=release CODESIGN_IDENTITY="$(RELEASE_CODESIGN_IDENTITY)" CODESIGN_OPTIONS="$(RELEASE_CODESIGN_OPTIONS)"
 
 run: sign
 	open "$(APP_BUNDLE)"
