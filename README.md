@@ -13,8 +13,17 @@ It is built for people who keep their most-used apps in the Dock, prefer custom 
   <img src="assets/screenshots/settings-window-management.png" alt="Zap Settings in Window Management mode" width="92%">
 </p>
 
+## Install
+
+Download `Zap-<version>.dmg` from the [latest release](https://github.com/woosublee/zap/releases/latest), open it, and drag `Zap.app` to `/Applications`.
+
+Zap 1.0.0 and later are signed with a Developer ID certificate and notarized by Apple, so macOS opens Zap without a Gatekeeper warning. Zap checks for updates automatically and can also check from **Check for Updates** in the menu bar menu or Settings > General.
+
+If you are updating from Zap 0.1.11 or earlier, macOS asks you to grant Accessibility access to Zap again once, because earlier builds used a different signing certificate. If window shortcuts stop working after the update, remove Zap from System Settings > Privacy & Security > Accessibility and add it again.
+
 ## Recent updates
 
+- Zap 1.0.0 is the first Developer ID signed and notarized release.
 - Added Window Management shortcuts for centering, fullscreen, halves, corners, thirds, resizing, display movement, undo, and redo.
 - Reworked Settings into a sidebar with Automatic, Manual, Window Management, General, and About pages.
 - Updated the menu bar experience with native Quick Launch and Window Control menus.
