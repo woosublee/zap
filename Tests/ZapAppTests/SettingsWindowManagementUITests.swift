@@ -169,18 +169,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("window.orderFrontRegardless()"))
     }
 
-    func testWindowManagementUsesSharedAdaptiveTwoColumnRowsForEveryCategory() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertTrue(source.contains("private let shortcutColumns = ["))
-        XCTAssertTrue(source.contains("GridItem(.adaptive(minimum: 240)"))
-        XCTAssertTrue(source.contains("LazyVGrid(columns: shortcutColumns"))
-        XCTAssertFalse(source.contains("LazyVGrid(columns: positioningColumns"))
-        XCTAssertFalse(source.contains("private let positioningColumns"))
-        XCTAssertFalse(source.contains("if category == .positioning"))
-    }
-
     func testWindowManagementGlobalToggleUsesSwitchStyle() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
@@ -239,17 +227,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("Refresh Permission"))
     }
 
-    func testWindowManagementSettingsDeletesStatusCardButKeepsInlineErrors() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertFalse(source.contains("SettingsCard(title: \"Status\")"))
-        XCTAssertTrue(source.contains("shortcutErrorMessages"))
-        XCTAssertTrue(source.contains("if let registrationError"))
-        XCTAssertTrue(source.contains("if let shortcutRegistrationError = model.shortcutRegistrationError"))
-        XCTAssertTrue(source.contains("if let windowManagementError = model.windowManagementError"))
-    }
-
     func testWindowManagementSettingsGroupsShortcutsByCategoryAndLocksWhenPermissionIsMissing() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
@@ -263,34 +240,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("!model.accessibilityTrusted"))
         XCTAssertTrue(rowSource.contains("WindowActionDiagramView"))
         XCTAssertTrue(rowSource.contains("ShortcutKeycapGroupView"))
-    }
-
-    func testWindowManagementGlobalToggleRemainsAvailableWithoutAccessibilityPermission() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertFalse(source.contains(".disabled(!model.accessibilityTrusted)"))
-        XCTAssertTrue(source.contains("WindowShortcutCategoryGroup"))
-        XCTAssertTrue(source.contains("shortcutColumns"))
-        XCTAssertTrue(source.contains("isLocked: !model.accessibilityTrusted"))
-        XCTAssertTrue(source.contains("Grant \\(AccessibilityPaneName.current) in General to enable and run window shortcuts."))
-        XCTAssertFalse(source.contains("Grant Accessibility in General"))
-    }
-
-    func testWindowManagementSettingsReceivesAndDisplaysGlobalRegistrationError() throws {
-        let settingsSource = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-        let windowManagementSource = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertTrue(settingsSource.contains("WindowManagementSettingsView("))
-        XCTAssertTrue(settingsSource.contains("model: model.windowManagementModel"))
-        XCTAssertTrue(settingsSource.contains("registrationError: model.registrationError"))
-        XCTAssertTrue(settingsSource.contains("inputSourceRevision: model.inputSourceRevision"))
-        XCTAssertTrue(windowManagementSource.contains("let registrationError: String?"))
-        XCTAssertTrue(windowManagementSource.contains("let inputSourceRevision: Int"))
-        XCTAssertTrue(windowManagementSource.contains("if let registrationError"))
-        XCTAssertTrue(windowManagementSource.contains("Label(registrationError"))
     }
 
     func testWindowShortcutRowsUseKeycapClickForRecordingAndIconButtonForEnablement() throws {
@@ -308,15 +257,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(rowSource.contains(".accessibilityLabel(shortcut.isEnabled ? \"Disable \\(shortcut.action.title)\" : \"Enable \\(shortcut.action.title)\")"))
         XCTAssertFalse(rowSource.contains(".toggleStyle(.switch)"))
         XCTAssertTrue(rowSource.contains(".accessibilityLabel(\"Record shortcut for \\(shortcut.action.title)\")"))
-    }
-
-    func testWindowManagementPositioningCategoryUsesSharedTwoColumnGrid() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertFalse(source.contains("if category == .positioning"))
-        XCTAssertTrue(source.contains("LazyVGrid(columns: shortcutColumns"))
-        XCTAssertFalse(source.contains("private let positioningColumns"))
     }
 
     func testAppsScreenCombinesDockAppsAndCustomApps() throws {
@@ -359,5 +299,44 @@ final class SettingsWindowManagementUITests: XCTestCase {
 
         XCTAssertTrue(rowSource.contains("            .opacity(isDisabled ? 0.62 : 1)\n\n            if let isOn {"))
         XCTAssertFalse(rowSource.contains("        .opacity(isDisabled ? 0.62 : 1)\n    }\n}"))
+    }
+
+    func testWindowsScreenUsesSingleColumnRowsWithDividers() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
+
+        XCTAssertFalse(source.contains("LazyVGrid"))
+        XCTAssertFalse(source.contains("shortcutColumns"))
+        XCTAssertTrue(source.contains("ForEach(Array(shortcuts.enumerated()), id: \\.element.id) { index, shortcut in"))
+        XCTAssertTrue(source.contains("if index > 0 {\n                        Divider()\n                    }"))
+        XCTAssertTrue(source.contains(".textCase(.uppercase)"))
+        XCTAssertFalse(source.contains("category.systemImage"))
+    }
+
+    func testWindowsCardPutsEnableSwitchAndResetInTitleRow() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
+
+        XCTAssertTrue(source.contains("SettingsCard(title: \"Window Shortcuts\")"))
+        XCTAssertFalse(source.contains("Grouped by what each shortcut changes"))
+        XCTAssertTrue(source.contains("} accessory: {"))
+        XCTAssertTrue(source.contains("Toggle(\"Enable window management shortcuts\", isOn: Binding("))
+        XCTAssertTrue(source.contains(".labelsHidden()"))
+        XCTAssertTrue(source.contains("Button(\"Reset to Defaults\")"))
+        XCTAssertFalse(source.contains(".disabled(!model.accessibilityTrusted)"))
+        XCTAssertTrue(source.contains("isLocked: !model.accessibilityTrusted"))
+        XCTAssertTrue(source.contains("Grant \\(AccessibilityPaneName.current) in General to use window shortcuts."))
+    }
+
+    func testWindowsScreenShowsAllErrorsInOneBanner() throws {
+        let settingsSource = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
+
+        XCTAssertTrue(settingsSource.contains("registrationError: model.registrationError"))
+        XCTAssertTrue(source.contains("SettingsIssueBanner(messages: [\n                registrationError,\n                model.shortcutRegistrationError,\n                model.windowManagementError\n            ])"))
+        XCTAssertFalse(source.contains("shortcutErrorMessages"))
+        XCTAssertFalse(source.contains("Label(registrationError"))
     }
 }

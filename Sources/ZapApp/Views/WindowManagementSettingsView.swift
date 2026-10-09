@@ -14,31 +14,20 @@ struct WindowManagementSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: ZapSpacing.large) {
+            SettingsIssueBanner(messages: [
+                registrationError,
+                model.shortcutRegistrationError,
+                model.windowManagementError
+            ])
+
             shortcutsSection
         }
     }
 
     private var shortcutsSection: some View {
-        SettingsCard(
-            title: "Shortcuts",
-            subtitle: "Grouped by what each shortcut changes, so the full set stays scannable."
-        ) {
-            HStack(spacing: 12) {
-                Toggle("Enable window management shortcuts", isOn: Binding(
-                    get: { model.isWindowManagementEnabled },
-                    set: { model.setWindowManagementEnabled($0) }
-                ))
-                .toggleStyle(.switch)
-
-                Spacer()
-
-                Button("Reset to Defaults") {
-                    model.resetShortcutsToDefaults()
-                }
-            }
-
+        SettingsCard(title: "Window Shortcuts") {
             if !model.accessibilityTrusted {
-                Label("Grant \(AccessibilityPaneName.current) in General to enable and run window shortcuts.", systemImage: "lock.fill")
+                Label("Grant \(AccessibilityPaneName.current) in General to use window shortcuts.", systemImage: "lock.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(10)
@@ -46,7 +35,7 @@ struct WindowManagementSettingsView: View {
                     .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 ForEach(WindowActionCategory.allCases, id: \.self) { category in
                     if let shortcuts = shortcutsByCategory[category], !shortcuts.isEmpty {
                         WindowShortcutCategoryGroup(
@@ -72,41 +61,25 @@ struct WindowManagementSettingsView: View {
                     }
                 }
             }
+        } accessory: {
+            HStack(spacing: ZapSpacing.medium) {
+                Toggle("Enable window management shortcuts", isOn: Binding(
+                    get: { model.isWindowManagementEnabled },
+                    set: { model.setWindowManagementEnabled($0) }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
 
-            shortcutErrorMessages
+                Button("Reset to Defaults") {
+                    model.resetShortcutsToDefaults()
+                }
+                .controlSize(.small)
+            }
         }
     }
 
     private var shortcutsByCategory: [WindowActionCategory: [WindowShortcut]] {
         Dictionary(grouping: model.windowShortcuts) { $0.action.category }
-    }
-
-    @ViewBuilder
-    private var shortcutErrorMessages: some View {
-        if registrationError != nil || model.shortcutRegistrationError != nil || model.windowManagementError != nil {
-            VStack(alignment: .leading, spacing: 6) {
-                if let registrationError {
-                    Label(registrationError, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-
-                if let shortcutRegistrationError = model.shortcutRegistrationError {
-                    Label(shortcutRegistrationError, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-
-                if let windowManagementError = model.windowManagementError {
-                    Label(windowManagementError, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
     }
 }
 
@@ -119,23 +92,19 @@ private struct WindowShortcutCategoryGroup: View {
     let setRecordingActive: (Bool) -> Void
     let record: (WindowShortcut, RecordedShortcut) -> Void
 
-    private let shortcutColumns = [
-        GridItem(.adaptive(minimum: 240), spacing: 8, alignment: .top)
-    ]
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 7) {
-                Image(systemName: category.systemImage)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                Text(category.title)
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-            }
+        VStack(alignment: .leading, spacing: 2) {
+            Text(category.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
 
-            LazyVGrid(columns: shortcutColumns, alignment: .leading, spacing: 8) {
-                ForEach(shortcuts) { shortcut in
+            VStack(spacing: 0) {
+                ForEach(Array(shortcuts.enumerated()), id: \.element.id) { index, shortcut in
+                    if index > 0 {
+                        Divider()
+                    }
+
                     WindowShortcutRowView(
                         shortcut: shortcut,
                         isLocked: isLocked,
@@ -144,9 +113,6 @@ private struct WindowShortcutCategoryGroup: View {
                         setRecordingActive: setRecordingActive,
                         record: { recordedShortcut in record(shortcut, recordedShortcut) }
                     )
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
             }
         }
@@ -161,15 +127,6 @@ private extension WindowActionCategory {
         case .display: "Display"
         case .sizing: "Sizing"
         case .history: "History"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .positioning: "rectangle.split.3x3"
-        case .display: "display.2"
-        case .sizing: "arrow.up.left.and.arrow.down.right"
-        case .history: "arrow.uturn.backward.circle"
         }
     }
 }
