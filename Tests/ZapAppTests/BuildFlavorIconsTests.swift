@@ -10,10 +10,6 @@ final class BuildFlavorIconsTests: XCTestCase {
             .deletingLastPathComponent()
     }
 
-    private func menuBarBaseIcon() throws -> NSImage {
-        try XCTUnwrap(NSImage(contentsOf: packageRootURL.appendingPathComponent("Resources/ZapMenuBarIcon.png")))
-    }
-
     private func appBaseIcon() throws -> NSImage {
         try XCTUnwrap(NSImage(contentsOf: packageRootURL.appendingPathComponent("Resources/Zap.icns")))
     }
@@ -25,26 +21,23 @@ final class BuildFlavorIconsTests: XCTestCase {
     }
 
     func testMenuBarIconsAreEighteenPointTemplates() throws {
-        let base = try menuBarBaseIcon()
-
         for flavor in [AppBuildFlavor.official, .development] {
-            let icon = BuildFlavorIcons.menuBarIcon(base: base, flavor: flavor)
+            let icon = BuildFlavorIcons.menuBarIcon(flavor: flavor)
             XCTAssertTrue(icon.isTemplate, "\(flavor)")
             XCTAssertEqual(icon.size, NSSize(width: 18, height: 18), "\(flavor)")
         }
     }
 
     func testDevelopmentMenuBarIconFillsBackgroundAndCutsOutTheMark() throws {
-        let base = try menuBarBaseIcon()
-        let official = try alphaMap(BuildFlavorIcons.menuBarIcon(base: base, flavor: .official))
-        let development = try alphaMap(BuildFlavorIcons.menuBarIcon(base: base, flavor: .development))
+        let official = try alphaMap(BuildFlavorIcons.menuBarIcon(flavor: .official))
+        let development = try alphaMap(BuildFlavorIcons.menuBarIcon(flavor: .development))
 
         // Edge of the canvas (outside the official mark) is filled in the dev icon.
         XCTAssertLessThan(official.alpha(x: 18, y: 2), 0.1)
         XCTAssertGreaterThan(development.alpha(x: 18, y: 2), 0.9)
 
         // Pixels that the dev icon draws the mark over are cut out of the fill.
-        let insetMark = try alphaMap(BuildFlavorIcons.developmentMark(base: base))
+        let insetMark = try alphaMap(BuildFlavorIcons.developmentMark())
         var markPixels = 0
         var cutOutPixels = 0
         for y in 0..<insetMark.height {
@@ -55,6 +48,29 @@ final class BuildFlavorIconsTests: XCTestCase {
         }
         XCTAssertGreaterThan(markPixels, 50)
         XCTAssertGreaterThan(Double(cutOutPixels) / Double(markPixels), 0.9)
+    }
+
+    func testDevelopmentBoltIsCloseToOfficialBoltSize() throws {
+        let official = try alphaMap(BuildFlavorIcons.menuBarIcon(flavor: .official)).opaqueBounds()
+        let developmentMark = try alphaMap(BuildFlavorIcons.developmentMark()).opaqueBounds()
+
+        XCTAssertGreaterThanOrEqual(official.height, 14 * 2, "official bolt should fill most of the 18pt canvas")
+        XCTAssertGreaterThanOrEqual(developmentMark.height, official.height * 0.75)
+    }
+
+    func testBoltKeepsTheChunkyMenuBarProportions() throws {
+        let official = try alphaMap(BuildFlavorIcons.menuBarIcon(flavor: .official)).opaqueBounds()
+
+        XCTAssertGreaterThanOrEqual(official.width / official.height, 0.7)
+    }
+
+    func testVectorBoltIsSharperThanBundledBitmapAtRetinaScale() throws {
+        let bitmap = try XCTUnwrap(NSImage(contentsOf: packageRootURL.appendingPathComponent("Resources/ZapMenuBarIcon.png")))
+
+        let vectorBlur = try alphaMap(BuildFlavorIcons.menuBarIcon(flavor: .official)).partialToOpaqueRatio()
+        let bitmapBlur = try alphaMap(bitmap).partialToOpaqueRatio()
+
+        XCTAssertLessThan(vectorBlur, bitmapBlur)
     }
 
     func testOfficialBuildKeepsBundleAppIcon() throws {
@@ -78,7 +94,7 @@ final class BuildFlavorIconsTests: XCTestCase {
     func testZapAppUsesFlavorIcons() throws {
         let source = try String(contentsOf: packageRootURL.appendingPathComponent("Sources/ZapApp/ZapApp.swift"))
 
-        XCTAssertTrue(source.contains("BuildFlavorIcons.menuBarIcon(base: base, flavor: AppBuildFlavor.current)"))
+        XCTAssertTrue(source.contains("BuildFlavorIcons.menuBarIcon(flavor: AppBuildFlavor.current)"))
         XCTAssertTrue(source.contains("if let icon = BuildFlavorIcons.appIcon(base: NSApplication.shared.applicationIconImage, flavor: AppBuildFlavor.current) {\n            NSApplication.shared.applicationIconImage = icon\n        }"))
     }
 
@@ -91,6 +107,29 @@ final class BuildFlavorIconsTests: XCTestCase {
 
         func alpha(x: Int, y: Int) -> CGFloat {
             bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0
+        }
+
+        func partialToOpaqueRatio() -> Double {
+            var partial = 0
+            var opaque = 0
+            for y in 0..<height {
+                for x in 0..<width {
+                    let value = alpha(x: x, y: y)
+                    if value > 0.95 { opaque += 1 } else if value > 0.05 { partial += 1 }
+                }
+            }
+            return Double(partial) / Double(max(opaque, 1))
+        }
+
+        func opaqueBounds() -> CGRect {
+            var minX = width, minY = height, maxX = -1, maxY = -1
+            for y in 0..<height {
+                for x in 0..<width where alpha(x: x, y: y) > 0.5 {
+                    minX = min(minX, x); maxX = max(maxX, x)
+                    minY = min(minY, y); maxY = max(maxY, y)
+                }
+            }
+            return maxX < 0 ? .zero : CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
         }
     }
 

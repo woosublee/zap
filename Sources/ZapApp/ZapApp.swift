@@ -55,17 +55,11 @@ struct ZapApp: App {
 
     @ViewBuilder
     private var menuBarIcon: some View {
-        if let base = NSImage(named: "ZapMenuBarIcon") {
-            let image = BuildFlavorIcons.menuBarIcon(base: base, flavor: AppBuildFlavor.current)
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 18, height: 18)
-                .accessibilityLabel(AboutPresentation.currentAppName)
-        } else {
-            Image(systemName: "bolt.fill")
-                .accessibilityLabel(AboutPresentation.currentAppName)
-        }
+        Image(nsImage: BuildFlavorIcons.menuBarIcon(flavor: AppBuildFlavor.current))
+            .resizable()
+            .scaledToFit()
+            .frame(width: 18, height: 18)
+            .accessibilityLabel(AboutPresentation.currentAppName)
     }
 
     private func openSettings(initialMode: SettingsMode? = nil) {
