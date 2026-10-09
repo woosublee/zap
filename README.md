@@ -23,6 +23,7 @@ If you are updating from Zap 0.1.11 or earlier, macOS asks you to grant Accessib
 
 ## Recent updates
 
+- Simplified Settings into General, Apps, and Windows pages. About moved to **About Zap** in the menu bar menu.
 - Zap 1.0.0 is the first Developer ID signed and notarized release.
 - Added Window Management shortcuts for centering, fullscreen, halves, corners, thirds, resizing, display movement, undo, and redo.
 - Reworked Settings into a sidebar with Automatic, Manual, Window Management, General, and About pages.
@@ -69,7 +70,7 @@ Window Management moves and resizes the frontmost window with customizable globa
 - larger and smaller resize shortcuts;
 - undo and redo for window layout changes.
 
-Window Management requires macOS Accessibility permission so Zap can move and resize other apps' windows. If permission has not been granted yet, Zap shows the permission state in Settings and locks the window shortcuts until access is available.
+Window Management requires macOS Accessibility permission so Zap can move and resize other apps' windows. If permission has not been granted yet, Zap shows a **Grant…** button on the Windows page and locks the window shortcuts until access is available. Dock and custom app shortcuts work without it.
 
 ### Finder shortcut
 
@@ -92,6 +93,7 @@ The native menu bar menu includes:
 - Window Control for Window Management actions;
 - Refresh Dock Apps;
 - Check for Updates;
+- About Zap;
 - Settings;
 - Quit.
 
@@ -99,29 +101,21 @@ If you hide the menu bar icon, Zap switches to a regular Dock app so Settings is
 
 ## Settings
 
-Zap Settings is organized into sidebar pages.
-
-### Automatic
-
-Use Automatic to configure Dock app number shortcuts, enable or disable the Finder shortcut, refresh the Dock app list, and review the current Dock app mapping.
-
-### Manual
-
-Use Manual to add app shortcuts, record custom shortcuts, enable or disable shortcuts, and remove shortcuts you no longer need.
-
-### Window Management
-
-Use Window Management to enable or disable window shortcuts, review shortcuts by category, record custom shortcuts for each action, reset shortcuts to their defaults, and check Accessibility permission status.
+Zap Settings is organized into three sidebar pages. Settings reopens on the page you last used.
 
 ### General
 
-Use General to request Accessibility permission, enable or disable launch at login, show or hide the menu bar icon, and check for updates.
+Use General to record the shortcut that turns Zap on or off for the current app, enable or disable launch at login, show or hide the menu bar icon, and check for updates. The sidebar also shows the current version.
 
-### About
+### Apps
 
-Use About to view the current app version, build number, and creator link.
+Use Apps to choose the modifier keys for Dock number shortcuts, turn the Finder shortcut on or off, refresh and review the Dock app mapping, and manage custom app shortcuts: add apps, record shortcuts, enable or disable them, and remove them.
 
-Automatic, Manual, and Window Management shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Zap shows a registration error.
+### Windows
+
+Use Windows to enable or disable window shortcuts, review shortcuts by category, record custom shortcuts for each action, and reset shortcuts to their defaults. Window shortcuts need Accessibility permission. Until it is granted, Windows shows a **Grant…** button and the sidebar marks Windows with a warning icon. Dock and custom app shortcuts work without it.
+
+Dock, custom app, and window shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Zap shows a registration error at the top of Settings.
 
 ## Privacy and permissions
 

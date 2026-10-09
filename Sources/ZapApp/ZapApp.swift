@@ -23,6 +23,7 @@ struct ZapApp: App {
             MenuBarView(
                 model: model,
                 updateService: updateService,
+                openAbout: { AboutWindowPresenter.open() },
                 openSettings: { openSettings() },
                 quit: { NSApp.terminate(nil) }
             )
@@ -37,8 +38,10 @@ struct ZapApp: App {
                 }
                 .keyboardShortcut(",", modifiers: .command)
 
-                Button("Check for Updates...") {
-                    updateService.checkForUpdates()
+                if AppDistribution.current.supportsInAppUpdates {
+                    Button("Check for Updates...") {
+                        updateService.checkForUpdates()
+                    }
                 }
             }
             CommandGroup(replacing: .appTermination) {

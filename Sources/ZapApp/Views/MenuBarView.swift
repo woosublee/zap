@@ -4,6 +4,7 @@ import ZapCore
 struct MenuBarView: View {
     @ObservedObject var model: ZapAppModel
     @ObservedObject var updateService: UpdateService
+    let openAbout: () -> Void
     let openSettings: () -> Void
     let quit: () -> Void
 
@@ -20,12 +21,17 @@ struct MenuBarView: View {
         Button("Refresh Dock Apps") {
             model.refreshDockItems()
         }
-        Button("Check for Updates...") {
-            updateService.checkForUpdates()
+        if AppDistribution.current.supportsInAppUpdates {
+            Button("Check for Updates...") {
+                updateService.checkForUpdates()
+            }
         }
 
         Divider()
 
+        Button(AboutPresentation.aboutMenuLabel(appName: AboutPresentation.currentAppName)) {
+            openAbout()
+        }
         Button("Settings...") {
             openSettings()
         }

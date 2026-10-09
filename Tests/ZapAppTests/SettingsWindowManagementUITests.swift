@@ -9,41 +9,25 @@ final class SettingsWindowManagementUITests: XCTestCase {
             .deletingLastPathComponent()
     }
 
-    func testSettingsModeIncludesShortcutModesAndGeneral() {
-        XCTAssertEqual(SettingsMode.allCases.map(\.title), [
-            "Automatic",
-            "Manual",
-            "Window Management",
-            "General",
-            "About"
-        ])
-    }
-
-    func testSettingsSidebarGroupsShortcutModesAndSystemGeneral() throws {
+    func testSettingsSidebarListsModesWithoutSectionHeadersAndShowsVersion() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
-        XCTAssertTrue(source.contains("sidebarSection(title: \"Shortcuts\", modes: [.automatic, .manual, .windowManagement])"))
-        XCTAssertTrue(source.contains("sidebarSection(title: \"System\", modes: [.general, .about])"))
-        XCTAssertTrue(source.contains("case .general:"))
-        XCTAssertTrue(source.contains("case .about:"))
-        XCTAssertTrue(source.contains("generalSection"))
-        XCTAssertTrue(source.contains("aboutSection"))
-        XCTAssertFalse(source.contains("case .setting"))
-        XCTAssertFalse(source.contains("settingSection"))
-        XCTAssertFalse(source.contains("\"Setting\""))
+        XCTAssertTrue(source.contains("ForEach(SettingsMode.allCases) { mode in"))
+        XCTAssertFalse(source.contains("sidebarSection("))
+        XCTAssertFalse(source.contains("\"Shortcuts\", modes:"))
+        XCTAssertFalse(source.contains("\"System\", modes:"))
+        XCTAssertTrue(source.contains("Text(sidebarVersionLine)"))
+        XCTAssertTrue(source.contains("AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current).versionLine"))
     }
 
-    func testSettingsAboutModeRendersExistingAboutViewWithoutExtraCardWrapper() throws {
+    func testSettingsNoLongerHasAboutScreen() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
-        XCTAssertTrue(source.contains("case .about:"))
-        XCTAssertTrue(source.contains("aboutSection"))
-        XCTAssertTrue(source.contains("AboutView(presentation: AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current))"))
-        XCTAssertFalse(source.contains("SettingsCard(title: AboutPresentation.aboutMenuLabel(appName: AboutPresentation.currentAppName))"))
-        XCTAssertTrue(source.contains("case .about: \"About\""))
-        XCTAssertTrue(source.contains("case .about: \"info.circle\""))
+        XCTAssertFalse(source.contains("aboutSection"))
+        XCTAssertFalse(source.contains("AboutView("))
+        XCTAssertFalse(source.contains("case .about"))
     }
 
     func testSettingsContentDoesNotRenderPerModeHeader() throws {
@@ -55,15 +39,19 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("selectedMode.subtitle"))
     }
 
-    func testSettingsViewRoutesWindowManagementModeAndKeepsExistingModes() throws {
+    func testSettingsViewRoutesThreeModes() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
-        XCTAssertTrue(source.contains("case automatic"))
-        XCTAssertTrue(source.contains("case manual"))
-        XCTAssertTrue(source.contains("case windowManagement"))
-        XCTAssertTrue(source.contains("Window Management"))
+        XCTAssertTrue(source.contains("case general"))
+        XCTAssertTrue(source.contains("case apps"))
+        XCTAssertTrue(source.contains("case windows"))
+        XCTAssertTrue(source.contains("case .windows:"))
         XCTAssertTrue(source.contains("WindowManagementSettingsView"))
+        XCTAssertFalse(source.contains("case automatic"))
+        XCTAssertFalse(source.contains("case manual"))
+        XCTAssertFalse(source.contains("case windowManagement"))
+        XCTAssertFalse(source.contains("case about"))
     }
 
     func testSettingsViewUsesSidebarLayoutForModeNavigation() throws {
@@ -99,7 +87,8 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(settingsSource.contains("nonmutating set { navigationState.selectedMode = newValue }"))
         XCTAssertTrue(presenterSource.contains("private static var navigationState = SettingsNavigationState()"))
         XCTAssertTrue(presenterSource.contains("initialMode: SettingsMode? = nil"))
-        XCTAssertTrue(presenterSource.contains("navigationState = SettingsNavigationState(selectedMode: initialMode ?? .automatic)"))
+        XCTAssertTrue(presenterSource.contains("SettingsMode.initial(\n                    requested: initialMode,"))
+        XCTAssertTrue(presenterSource.contains("storedRawValue: UserDefaults.standard.string(forKey: SettingsMode.lastModeDefaultsKey)"))
         XCTAssertTrue(presenterSource.contains("navigationState.selectedMode = initialMode"))
         XCTAssertTrue(appSource.contains("private func openSettings(initialMode: SettingsMode? = nil)"))
         XCTAssertFalse(presenterSource.contains("window.contentViewController = NSHostingController(\n            rootView: SettingsView(model: model"))
@@ -109,7 +98,7 @@ final class SettingsWindowManagementUITests: XCTestCase {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
-        XCTAssertTrue(source.contains("accessibilityValue(isSelected ? \"Selected\" : \"Not selected\")"))
+        XCTAssertTrue(source.contains("isSelected ? \"Selected\" : \"Not selected\""))
     }
 
     func testSettingsSidebarItemUsesFullRowHitArea() throws {
@@ -119,25 +108,40 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains(".padding(.vertical, 8)\n            .frame(maxWidth: .infinity, alignment: .leading)\n            .contentShape(Rectangle())\n            .background("))
     }
 
-    func testGeneralSectionOwnsPermissionsBehaviorAndUpdates() throws {
+    func testGeneralSectionOwnsShortcutControlsBehaviorAndUpdatesButNotPermissions() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
         XCTAssertTrue(source.contains("private var generalSection: some View"))
-        XCTAssertTrue(source.contains("permissionsSection"))
-        XCTAssertTrue(source.contains("SettingsCard(title: \"Permissions\")"))
-        XCTAssertTrue(source.contains("title: AccessibilityPaneName.current"))
-        XCTAssertTrue(source.contains("Drag Zap into the list to let it move and resize windows."))
-        XCTAssertTrue(source.contains("Granted"))
-        XCTAssertTrue(source.contains("Button(\"Grant…\")"))
-        XCTAssertFalse(source.contains("Button(\"Request\")"))
-        XCTAssertTrue(source.contains("model.windowManagementModel.requestAccessibilityPermission(\n                                sourceFrame: PermissionGuideSourceFrame.atMouse\n                            )\n                            refreshAccessibilityPermission()"))
+        XCTAssertFalse(source.contains("permissionsSection"))
+        XCTAssertFalse(source.contains("SettingsCard(title: \"Permissions\")"))
+        XCTAssertFalse(source.contains("Button(\"Grant…\")"))
         XCTAssertTrue(source.contains(".onAppear {\n            refreshAccessibilityPermission()\n        }"))
         XCTAssertTrue(source.contains("NSApplication.didBecomeActiveNotification"))
         XCTAssertTrue(source.contains("model.windowManagementModel.refreshAccessibilityPermission()"))
-        XCTAssertFalse(source.contains("Required"))
         XCTAssertTrue(source.contains("SettingsCard(title: \"Behavior\")"))
         XCTAssertTrue(source.contains("SettingsCard(title: \"Updates\")"))
+        XCTAssertTrue(source.contains("if AppDistribution.current.supportsInAppUpdates {\n                updatesSection\n            }"))
+        XCTAssertTrue(source.contains("case .general:\n                        SettingsIssueBanner(messages: [model.registrationError])\n                        generalSection"))
+    }
+
+    func testWindowsSidebarItemWarnsWhenAccessibilityIsMissing() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains("private struct WindowsSidebarItem: View {\n    @ObservedObject var model: WindowManagementModel"))
+        XCTAssertTrue(source.contains("warning: model.accessibilityTrusted ? nil : \"Accessibility permission required\","))
+        XCTAssertTrue(source.contains("Image(systemName: \"exclamationmark.circle.fill\")"))
+        XCTAssertTrue(source.contains("WindowsSidebarItem(\n                        model: model.windowManagementModel,"))
+        XCTAssertFalse(source.contains("AccessibilityWarningBadge"))
+    }
+
+    func testSidebarWarningIsAnnouncedInAccessibilityValue() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains(".accessibilityValue(accessibilityValue)"))
+        XCTAssertTrue(source.contains("[isSelected ? \"Selected\" : \"Not selected\", warning]\n            .compactMap { $0 }\n            .joined(separator: \", \")"))
     }
 
     func testSettingsBodyDoesNotAppendBehaviorAndUpdatesToEveryMode() throws {
@@ -145,24 +149,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
         XCTAssertFalse(source.contains("case .windowManagement:\n                        WindowManagementSettingsView(model: model.windowManagementModel, registrationError: model.registrationError)\n                    }\n\n                    behaviorSection\n                    updatesSection"))
-    }
-
-    func testAutomaticDockAppsAlwaysIncludesFinderWithDisabledVisualState() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-
-        XCTAssertFalse(source.contains("if model.isFinderShortcutEnabled {\n                    ShortcutListRow(shortcut: model.finderShortcutTitle, title: \"Finder\")\n                }"))
-        XCTAssertTrue(source.contains("ShortcutListRow(\n                    shortcut: model.finderShortcutTitle,\n                    title: \"Finder\",\n                    isDisabled: !model.isFinderShortcutEnabled\n                )"))
-        XCTAssertTrue(source.contains("var isDisabled = false"))
-    }
-
-    func testFinderShortcutUsesSwitchToggleStyle() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-
-        XCTAssertTrue(source.contains("Toggle(\"Finder shortcut\", isOn: $model.isFinderShortcutEnabled)"))
-        XCTAssertTrue(source.contains(".toggleStyle(.switch)"))
-        XCTAssertFalse(source.contains("Toggle(isOn: $model.isFinderShortcutEnabled) {\n                HStack(spacing: 8)"))
     }
 
     func testManualShortcutRowsUseOneLineKeycapClickAndSwitchToggle() throws {
@@ -195,18 +181,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("window.orderFrontRegardless()"))
     }
 
-    func testWindowManagementUsesSharedAdaptiveTwoColumnRowsForEveryCategory() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertTrue(source.contains("private let shortcutColumns = ["))
-        XCTAssertTrue(source.contains("GridItem(.adaptive(minimum: 240)"))
-        XCTAssertTrue(source.contains("LazyVGrid(columns: shortcutColumns"))
-        XCTAssertFalse(source.contains("LazyVGrid(columns: positioningColumns"))
-        XCTAssertFalse(source.contains("private let positioningColumns"))
-        XCTAssertFalse(source.contains("if category == .positioning"))
-    }
-
     func testWindowManagementGlobalToggleUsesSwitchStyle() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
@@ -231,7 +205,7 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(rowSource.contains("Toggle(\"\", isOn: Binding("))
     }
 
-    func testSettingsStillContainsBehaviorAndSparkleUpdateControls() throws {
+    func testSettingsContainsBehaviorAndUpdateControlsWithoutSparkleCopy() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
@@ -240,20 +214,9 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("Show menu bar icon"))
         XCTAssertTrue(source.contains("SettingsCard(title: \"Updates\")"))
         XCTAssertTrue(source.contains("Automatically check for updates"))
-        XCTAssertTrue(source.contains("Check for Updates Now"))
-        XCTAssertTrue(source.contains("Updates are delivered with Sparkle"))
-    }
-
-    func testAutomaticAndManualShortcutControlsRemainWired() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-
-        XCTAssertTrue(source.contains("automaticShortcutsSection"))
-        XCTAssertTrue(source.contains("Finder shortcut"))
-        XCTAssertTrue(source.contains("Dock app shortcuts"))
-        XCTAssertTrue(source.contains("manualSection"))
-        XCTAssertTrue(source.contains("ManualShortcutRow"))
-        XCTAssertTrue(source.contains("Add App Shortcut"))
+        XCTAssertTrue(source.contains("Button(\"Check Now\")"))
+        XCTAssertFalse(source.contains("Check for Updates Now"))
+        XCTAssertFalse(source.contains("Sparkle"))
     }
 
     func testWindowManagementSettingsViewContainsEnableResetAndShortcutRows() throws {
@@ -276,17 +239,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("Refresh Permission"))
     }
 
-    func testWindowManagementSettingsDeletesStatusCardButKeepsInlineErrors() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertFalse(source.contains("SettingsCard(title: \"Status\")"))
-        XCTAssertTrue(source.contains("shortcutErrorMessages"))
-        XCTAssertTrue(source.contains("if let registrationError"))
-        XCTAssertTrue(source.contains("if let shortcutRegistrationError = model.shortcutRegistrationError"))
-        XCTAssertTrue(source.contains("if let windowManagementError = model.windowManagementError"))
-    }
-
     func testWindowManagementSettingsGroupsShortcutsByCategoryAndLocksWhenPermissionIsMissing() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
@@ -300,34 +252,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("!model.accessibilityTrusted"))
         XCTAssertTrue(rowSource.contains("WindowActionDiagramView"))
         XCTAssertTrue(rowSource.contains("ShortcutKeycapGroupView"))
-    }
-
-    func testWindowManagementGlobalToggleRemainsAvailableWithoutAccessibilityPermission() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertFalse(source.contains(".disabled(!model.accessibilityTrusted)"))
-        XCTAssertTrue(source.contains("WindowShortcutCategoryGroup"))
-        XCTAssertTrue(source.contains("shortcutColumns"))
-        XCTAssertTrue(source.contains("isLocked: !model.accessibilityTrusted"))
-        XCTAssertTrue(source.contains("Grant \\(AccessibilityPaneName.current) in General to enable and run window shortcuts."))
-        XCTAssertFalse(source.contains("Grant Accessibility in General"))
-    }
-
-    func testWindowManagementSettingsReceivesAndDisplaysGlobalRegistrationError() throws {
-        let settingsSource = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-        let windowManagementSource = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
-
-        XCTAssertTrue(settingsSource.contains("WindowManagementSettingsView("))
-        XCTAssertTrue(settingsSource.contains("model: model.windowManagementModel"))
-        XCTAssertTrue(settingsSource.contains("registrationError: model.registrationError"))
-        XCTAssertTrue(settingsSource.contains("inputSourceRevision: model.inputSourceRevision"))
-        XCTAssertTrue(windowManagementSource.contains("let registrationError: String?"))
-        XCTAssertTrue(windowManagementSource.contains("let inputSourceRevision: Int"))
-        XCTAssertTrue(windowManagementSource.contains("if let registrationError"))
-        XCTAssertTrue(windowManagementSource.contains("Label(registrationError"))
     }
 
     func testWindowShortcutRowsUseKeycapClickForRecordingAndIconButtonForEnablement() throws {
@@ -347,12 +271,95 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(rowSource.contains(".accessibilityLabel(\"Record shortcut for \\(shortcut.action.title)\")"))
     }
 
-    func testWindowManagementPositioningCategoryUsesSharedTwoColumnGrid() throws {
+    func testAppsScreenCombinesDockAppsAndCustomApps() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains("case .apps:\n                        SettingsIssueBanner(messages: [model.registrationError])\n                        dockAppsSection\n                        customAppsSection"))
+        XCTAssertTrue(source.contains("SettingsCard(title: \"Dock Apps\", subtitle: \"Your first nine pinned Dock apps, in order.\")"))
+        XCTAssertTrue(source.contains("SettingsCard(title: \"Custom Apps\", subtitle: \"Any app, any shortcut.\")"))
+        XCTAssertTrue(source.contains("Button(\"Add App…\")"))
+        XCTAssertTrue(source.contains("Text(\"No custom apps yet\")"))
+        XCTAssertTrue(source.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
+        XCTAssertTrue(source.contains("Text(\"Modifier\")"))
+        XCTAssertTrue(source.contains("Text(\"+ 1–9\")"))
+        XCTAssertTrue(source.contains("ManualShortcutRow("))
+        XCTAssertFalse(source.contains("automaticShortcutsSection"))
+        XCTAssertFalse(source.contains("manualSection"))
+        XCTAssertFalse(source.contains("Refresh the Dock when pinned apps change."))
+        XCTAssertFalse(source.contains("Dock app shortcuts"))
+        XCTAssertFalse(source.contains("Add App Shortcut"))
+        XCTAssertFalse(source.contains("No manual shortcuts"))
+    }
+
+    func testFinderRowCarriesItsOwnSwitchAndAlwaysShows() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains("ShortcutListRow(\n                    shortcut: model.finderShortcutTitle,\n                    title: \"Finder\",\n                    isDisabled: !model.isFinderShortcutEnabled,\n                    isOn: $model.isFinderShortcutEnabled\n                )"))
+        XCTAssertTrue(source.contains("var isOn: Binding<Bool>? = nil"))
+        XCTAssertTrue(source.contains(".accessibilityLabel(\"Finder shortcut\")"))
+        XCTAssertFalse(source.contains("Toggle(\"Finder shortcut\", isOn: $model.isFinderShortcutEnabled)"))
+    }
+
+    func testFinderRowDimsOnlyKeycapAndTitleNotSwitch() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+        let rowStart = try XCTUnwrap(source.range(of: "private struct ShortcutListRow: View {"))
+        let rowEnd = try XCTUnwrap(source.range(of: "private struct ManualShortcutRow: View {"))
+        let rowSource = String(source[rowStart.lowerBound..<rowEnd.lowerBound])
+
+        XCTAssertTrue(rowSource.contains("            .opacity(isDisabled ? 0.62 : 1)\n\n            if let isOn {"))
+        XCTAssertFalse(rowSource.contains("        .opacity(isDisabled ? 0.62 : 1)\n    }\n}"))
+    }
+
+    func testWindowsScreenUsesSingleColumnRowsWithDividers() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
 
-        XCTAssertFalse(source.contains("if category == .positioning"))
-        XCTAssertTrue(source.contains("LazyVGrid(columns: shortcutColumns"))
-        XCTAssertFalse(source.contains("private let positioningColumns"))
+        XCTAssertFalse(source.contains("LazyVGrid"))
+        XCTAssertFalse(source.contains("shortcutColumns"))
+        XCTAssertTrue(source.contains("ForEach(Array(shortcuts.enumerated()), id: \\.element.id) { index, shortcut in"))
+        XCTAssertTrue(source.contains("if index > 0 {\n                        Divider()\n                    }"))
+        XCTAssertTrue(source.contains(".textCase(.uppercase)"))
+        XCTAssertFalse(source.contains("category.systemImage"))
+    }
+
+    func testWindowsCardPutsEnableSwitchAndResetInTitleRow() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
+
+        XCTAssertTrue(source.contains("SettingsCard(title: \"Window Shortcuts\")"))
+        XCTAssertFalse(source.contains("Grouped by what each shortcut changes"))
+        XCTAssertTrue(source.contains("} accessory: {"))
+        XCTAssertTrue(source.contains("Toggle(\"Enable window management shortcuts\", isOn: Binding("))
+        XCTAssertTrue(source.contains(".labelsHidden()"))
+        XCTAssertTrue(source.contains("Button(\"Reset to Defaults\")"))
+        XCTAssertFalse(source.contains(".disabled(!model.accessibilityTrusted)"))
+        XCTAssertTrue(source.contains("isLocked: !model.accessibilityTrusted"))
+        XCTAssertFalse(source.contains("in General to use window shortcuts."))
+    }
+
+    func testWindowsScreenShowsAllErrorsInOneBanner() throws {
+        let settingsSource = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
+
+        XCTAssertTrue(settingsSource.contains("registrationError: model.registrationError"))
+        XCTAssertTrue(source.contains("SettingsIssueBanner(messages: [\n                registrationError,\n                model.shortcutRegistrationError,\n                model.windowManagementError\n            ])"))
+        XCTAssertFalse(source.contains("shortcutErrorMessages"))
+        XCTAssertFalse(source.contains("Label(registrationError"))
+    }
+
+    func testWindowsScreenRequestsAccessibilityInPlaceOnlyWhenMissing() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
+
+        XCTAssertTrue(source.contains("if !model.accessibilityTrusted {\n                accessibilityPermissionRow\n            }"))
+        XCTAssertTrue(source.contains("title: AccessibilityPaneName.current,"))
+        XCTAssertTrue(source.contains("subtitle: \"Required to move and resize windows.\","))
+        XCTAssertTrue(source.contains("Button(\"Grant…\") {\n                    model.requestAccessibilityPermission(\n                        sourceFrame: PermissionGuideSourceFrame.atMouse\n                    )\n                    model.refreshAccessibilityPermission()\n                }"))
+        XCTAssertFalse(source.contains("Granted"))
     }
 }

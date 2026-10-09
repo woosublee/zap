@@ -4,9 +4,16 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 final class SettingsNavigationState: ObservableObject {
-    @Published var selectedMode: SettingsMode
+    @Published var selectedMode: SettingsMode {
+        didSet {
+            defaults.set(selectedMode.rawValue, forKey: SettingsMode.lastModeDefaultsKey)
+        }
+    }
 
-    init(selectedMode: SettingsMode = .automatic) {
+    private let defaults: UserDefaults
+
+    init(selectedMode: SettingsMode = .general, defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         self.selectedMode = selectedMode
     }
 }
@@ -23,7 +30,7 @@ struct SettingsView: View {
         model: ZapAppModel,
         updateService: UpdateService,
         showMenuBarIcon: Binding<Bool>,
-        initialMode: SettingsMode = .automatic,
+        initialMode: SettingsMode = .general,
         navigationState: SettingsNavigationState? = nil
     ) {
         self.model = model
@@ -46,21 +53,19 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: ZapSpacing.large) {
                     switch selectedMode {
-                    case .automatic:
-                        automaticShortcutsSection
-                        automaticSection
-                    case .manual:
-                        manualSection
-                    case .windowManagement:
+                    case .general:
+                        SettingsIssueBanner(messages: [model.registrationError])
+                        generalSection
+                    case .apps:
+                        SettingsIssueBanner(messages: [model.registrationError])
+                        dockAppsSection
+                        customAppsSection
+                    case .windows:
                         WindowManagementSettingsView(
                             model: model.windowManagementModel,
                             registrationError: model.registrationError,
                             inputSourceRevision: model.inputSourceRevision
                         )
-                    case .general:
-                        generalSection
-                    case .about:
-                        aboutSection
                     }
                 }
                 .padding(22)
@@ -117,7 +122,7 @@ struct SettingsView: View {
     }
 
     private var settingsSidebar: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 9) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
@@ -132,14 +137,32 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 15)
 
-            sidebarSection(title: "Shortcuts", modes: [.automatic, .manual, .windowManagement])
-
-            sidebarSection(title: "System", modes: [.general, .about])
-                .padding(.top, 10)
+            ForEach(SettingsMode.allCases) { mode in
+                if mode == .windows {
+                    WindowsSidebarItem(
+                        model: model.windowManagementModel,
+                        isSelected: selectedMode == mode
+                    ) {
+                        selectedMode = mode
+                    }
+                } else {
+                    SettingsSidebarItem(
+                        mode: mode,
+                        isSelected: selectedMode == mode
+                    ) {
+                        selectedMode = mode
+                    }
+                }
+            }
 
             Spacer()
+
+            Text(sidebarVersionLine)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
         }
         .padding(14)
         .frame(width: 216)
@@ -147,23 +170,8 @@ struct SettingsView: View {
         .background(.bar)
     }
 
-    private func sidebarSection(title: String, modes: [SettingsMode]) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .padding(.horizontal, 10)
-
-            ForEach(modes) { mode in
-                SettingsSidebarItem(
-                    mode: mode,
-                    isSelected: selectedMode == mode
-                ) {
-                    selectedMode = mode
-                }
-            }
-        }
+    private var sidebarVersionLine: String {
+        AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current).versionLine
     }
 
     private var menuBarIconBinding: Binding<Bool> {
@@ -178,50 +186,11 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: ZapSpacing.large) {
-            permissionsSection
             shortcutControlsSection
             behaviorSection
-            updatesSection
-        }
-    }
-
-    private var aboutSection: some View {
-        HStack {
-            Spacer(minLength: 0)
-            AboutView(presentation: AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current))
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var permissionsSection: some View {
-        SettingsCard(title: "Permissions") {
-            SettingsRow(
-                title: AccessibilityPaneName.current,
-                subtitle: "Drag Zap into the list to let it move and resize windows.",
-                leading: {
-                    Image(systemName: "hand.raised.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 24)
-                },
-                trailing: {
-                    if model.windowManagementModel.accessibilityTrusted {
-                        Label("Granted", systemImage: "checkmark.circle.fill")
-                            .font(.system(.callout, design: .default, weight: .semibold))
-                            .foregroundStyle(.green)
-                    } else {
-                        Button("Grant…") {
-                            model.windowManagementModel.requestAccessibilityPermission(
-                                sourceFrame: PermissionGuideSourceFrame.atMouse
-                            )
-                            refreshAccessibilityPermission()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-                }
-            )
+            if AppDistribution.current.supportsInAppUpdates {
+                updatesSection
+            }
         }
     }
 
@@ -259,38 +228,12 @@ struct SettingsView: View {
                     }
                 }
             )
-
-            if let registrationError = model.registrationError {
-                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        }
-    }
-
-    private var automaticShortcutsSection: some View {
-        SettingsCard(title: "Shortcuts", subtitle: "Choose the global modifiers Zap uses for Dock and Finder actions.") {
-            dockModifierSelector
-
-            Toggle("Finder shortcut", isOn: $model.isFinderShortcutEnabled)
-                .toggleStyle(.switch)
-
-            if let registrationError = model.registrationError {
-                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
         }
     }
 
     private var dockModifierSelector: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Dock app shortcuts")
-                Text("Choose the modifier keys used with 1–9")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Modifier")
 
             Spacer()
 
@@ -304,31 +247,23 @@ struct SettingsView: View {
                     }
                 }
 
-                ShortcutKeycapView(label: "1–9")
+                Text("+ 1–9")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private var automaticSection: some View {
-        SettingsCard(title: "Automatic Dock Apps", subtitle: "Pinned Dock apps mapped to number keys.") {
-            HStack {
-                Text("Refresh the Dock when pinned apps change.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    model.refreshDockItems()
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .controlSize(.small)
-            }
+    private var dockAppsSection: some View {
+        SettingsCard(title: "Dock Apps", subtitle: "Your first nine pinned Dock apps, in order.") {
+            dockModifierSelector
 
             LazyVGrid(columns: automaticShortcutColumns, alignment: .leading, spacing: 8) {
                 ShortcutListRow(
                     shortcut: model.finderShortcutTitle,
                     title: "Finder",
-                    isDisabled: !model.isFinderShortcutEnabled
+                    isDisabled: !model.isFinderShortcutEnabled,
+                    isOn: $model.isFinderShortcutEnabled
                 )
 
                 ForEach(NumberKey.allCases) { key in
@@ -339,6 +274,13 @@ struct SettingsView: View {
                     )
                 }
             }
+        } accessory: {
+            Button {
+                model.refreshDockItems()
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .controlSize(.small)
         }
     }
 
@@ -366,24 +308,19 @@ struct SettingsView: View {
         SettingsCard(title: "Updates") {
             Toggle("Automatically check for updates", isOn: $updateService.automaticallyChecksForUpdates)
 
-            Button("Check for Updates Now") {
-                updateService.checkForUpdates()
+            HStack {
+                Spacer()
+                Button("Check Now") {
+                    updateService.checkForUpdates()
+                }
             }
-
-            Text("Updates are delivered with Sparkle and verified using EdDSA signatures.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
-    private var manualSection: some View {
-        SettingsCard(title: "Manual App Shortcuts", subtitle: "Add apps and assign custom global shortcuts.") {
-            Button("Add App Shortcut...") {
-                addManualShortcut()
-            }
-
+    private var customAppsSection: some View {
+        SettingsCard(title: "Custom Apps", subtitle: "Any app, any shortcut.") {
             if model.manualShortcuts.isEmpty {
-                Text("No manual shortcuts")
+                Text("No custom apps yet")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 18)
@@ -397,12 +334,11 @@ struct SettingsView: View {
                     remove: { model.removeManualShortcut(id: shortcut.id) }
                 )
             }
-
-            if let registrationError = model.registrationError {
-                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+        } accessory: {
+            Button("Add App…") {
+                addManualShortcut()
             }
+            .controlSize(.small)
         }
     }
 
@@ -416,44 +352,45 @@ struct SettingsView: View {
 
         if panel.runModal() == .OK, let url = panel.url {
             model.addManualShortcut(appURL: url)
-            selectedMode = .manual
+            selectedMode = .apps
         }
     }
 }
 
 enum SettingsMode: String, CaseIterable, Identifiable {
-    case automatic
-    case manual
-    case windowManagement
     case general
-    case about
+    case apps
+    case windows
+
+    static let lastModeDefaultsKey = "settings_last_mode"
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .automatic: "Automatic"
-        case .manual: "Manual"
-        case .windowManagement: "Window Management"
         case .general: "General"
-        case .about: "About"
+        case .apps: "Apps"
+        case .windows: "Windows"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .automatic: "sparkle"
-        case .manual: "keyboard"
-        case .windowManagement: "rectangle.3.group"
         case .general: "gearshape"
-        case .about: "info.circle"
+        case .apps: "square.grid.2x2"
+        case .windows: "rectangle.3.group"
         }
+    }
+
+    static func initial(requested: SettingsMode?, storedRawValue: String?) -> SettingsMode {
+        requested ?? storedRawValue.flatMap(SettingsMode.init(rawValue:)) ?? .general
     }
 }
 
 private struct SettingsSidebarItem: View {
     let mode: SettingsMode
     let isSelected: Bool
+    var warning: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -466,6 +403,13 @@ private struct SettingsSidebarItem: View {
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                if warning != nil {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .help(warning ?? "")
+                        .accessibilityHidden(true)
+                }
             }
             .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
             .padding(.horizontal, 10)
@@ -479,7 +423,28 @@ private struct SettingsSidebarItem: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(mode.title)
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityValue: String {
+        [isSelected ? "Selected" : "Not selected", warning]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+    }
+}
+
+private struct WindowsSidebarItem: View {
+    @ObservedObject var model: WindowManagementModel
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        SettingsSidebarItem(
+            mode: .windows,
+            isSelected: isSelected,
+            warning: model.accessibilityTrusted ? nil : "Accessibility permission required",
+            action: action
+        )
     }
 }
 
@@ -502,20 +467,32 @@ private struct ShortcutListRow: View {
     let title: String
     var isEmpty = false
     var isDisabled = false
+    var isOn: Binding<Bool>? = nil
 
     var body: some View {
         HStack(spacing: 8) {
-            ShortcutKeycapGroupView(shortcut: shortcut, isDisabled: isEmpty || isDisabled)
-                .frame(width: 80, alignment: .leading)
-            Text(title)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .foregroundStyle(isEmpty || isDisabled ? .secondary : .primary)
+            HStack(spacing: 8) {
+                ShortcutKeycapGroupView(shortcut: shortcut, isDisabled: isEmpty || isDisabled)
+                    .frame(width: 80, alignment: .leading)
+                Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(isEmpty || isDisabled ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .opacity(isDisabled ? 0.62 : 1)
+
+            if let isOn {
+                Toggle("", isOn: isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .accessibilityLabel("Finder shortcut")
+            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(isEmpty ? 0.025 : 0.045), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .opacity(isDisabled ? 0.62 : 1)
     }
 }
 

@@ -13,7 +13,12 @@ enum SettingsWindowPresenter {
         initialMode: SettingsMode? = nil
     ) {
         if window == nil {
-            navigationState = SettingsNavigationState(selectedMode: initialMode ?? .automatic)
+            navigationState = SettingsNavigationState(
+                selectedMode: SettingsMode.initial(
+                    requested: initialMode,
+                    storedRawValue: UserDefaults.standard.string(forKey: SettingsMode.lastModeDefaultsKey)
+                )
+            )
             window = makeWindow(model: model, updateService: updateService, showMenuBarIcon: showMenuBarIcon)
         } else if let initialMode {
             navigationState.selectedMode = initialMode
