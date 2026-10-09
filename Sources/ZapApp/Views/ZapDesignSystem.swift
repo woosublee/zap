@@ -66,21 +66,39 @@ struct SettingsRow<Leading: View, Trailing: View>: View {
     }
 }
 
+enum ShortcutKeycapLabel {
+    static func display(_ label: String) -> String {
+        switch label {
+        case "Return": "↩"
+        case "Tab": "⇥"
+        case "Delete": "⌫"
+        case "Esc": "⎋"
+        default: label
+        }
+    }
+}
+
 struct ShortcutKeycapView: View {
     let label: String
     var isSelected = false
     var isDisabled = false
 
     var body: some View {
-        Text(label)
+        Text(displayLabel)
+            .lineLimit(1)
+            .fixedSize()
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .foregroundStyle(foregroundStyle)
             .frame(minWidth: 22, minHeight: 22)
-            .padding(.horizontal, label.count > 1 ? 7 : 0)
+            .padding(.horizontal, displayLabel.count > 1 ? 7 : 0)
             .background(backgroundShape)
             .overlay(borderShape)
             .opacity(isDisabled ? 0.55 : 1)
             .accessibilityLabel(label)
+    }
+
+    private var displayLabel: String {
+        ShortcutKeycapLabel.display(label)
     }
 
     private var foregroundStyle: Color {
