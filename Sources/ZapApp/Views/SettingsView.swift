@@ -54,8 +54,8 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: ZapSpacing.large) {
                     switch selectedMode {
                     case .general:
+                        SettingsIssueBanner(messages: [model.registrationError])
                         generalSection
-                        aboutSection
                     case .apps:
                         automaticShortcutsSection
                         automaticSection
@@ -122,7 +122,7 @@ struct SettingsView: View {
     }
 
     private var settingsSidebar: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 9) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
@@ -137,27 +137,9 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 15)
 
-            sidebarSection(title: "Settings", modes: SettingsMode.allCases)
-
-            Spacer()
-        }
-        .padding(14)
-        .frame(width: 216)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(.bar)
-    }
-
-    private func sidebarSection(title: String, modes: [SettingsMode]) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .padding(.horizontal, 10)
-
-            ForEach(modes) { mode in
+            ForEach(SettingsMode.allCases) { mode in
                 SettingsSidebarItem(
                     mode: mode,
                     isSelected: selectedMode == mode
@@ -165,7 +147,22 @@ struct SettingsView: View {
                     selectedMode = mode
                 }
             }
+
+            Spacer()
+
+            Text(sidebarVersionLine)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
         }
+        .padding(14)
+        .frame(width: 216)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(.bar)
+    }
+
+    private var sidebarVersionLine: String {
+        AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current).versionLine
     }
 
     private var menuBarIconBinding: Binding<Bool> {
@@ -183,24 +180,17 @@ struct SettingsView: View {
             permissionsSection
             shortcutControlsSection
             behaviorSection
-            updatesSection
+            if AppDistribution.current.supportsInAppUpdates {
+                updatesSection
+            }
         }
-    }
-
-    private var aboutSection: some View {
-        HStack {
-            Spacer(minLength: 0)
-            AboutView(presentation: AboutPresentation(appName: AboutPresentation.currentAppName, info: AboutInfo.current))
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private var permissionsSection: some View {
         SettingsCard(title: "Permissions") {
             SettingsRow(
                 title: AccessibilityPaneName.current,
-                subtitle: "Drag Zap into the list to let it move and resize windows.",
+                subtitle: "Required for window shortcuts and per-app toggling.",
                 leading: {
                     Image(systemName: "hand.raised.fill")
                         .font(.system(size: 18, weight: .semibold))
@@ -261,12 +251,6 @@ struct SettingsView: View {
                     }
                 }
             )
-
-            if let registrationError = model.registrationError {
-                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
         }
     }
 
@@ -368,13 +352,12 @@ struct SettingsView: View {
         SettingsCard(title: "Updates") {
             Toggle("Automatically check for updates", isOn: $updateService.automaticallyChecksForUpdates)
 
-            Button("Check for Updates Now") {
-                updateService.checkForUpdates()
+            HStack {
+                Spacer()
+                Button("Check Now") {
+                    updateService.checkForUpdates()
+                }
             }
-
-            Text("Updates are delivered with Sparkle and verified using EdDSA signatures.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
