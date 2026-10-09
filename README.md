@@ -1,211 +1,97 @@
 # Zap
 
-Zap is a native macOS utility for opening apps, switching to them, and managing windows with global keyboard shortcuts.
+**한국어** | [English](README.en.md)
 
-It is built for people who keep their most-used apps in the Dock, prefer custom app shortcuts, and want keyboard-first window control. Zap can automatically map Dock apps to number shortcuts, register manual app shortcuts, and move or resize the frontmost window without reaching for the mouse.
+키보드만으로 앱을 열고, 전환하고, 창을 정리하는 macOS 앱입니다.
 
-## Screenshots
+Dock에 고정한 앱을 `⌥1`~`⌥9`로 바로 열고, 원하는 앱에 나만의 단축키를 붙이고, 지금 보고 있는 창을 마우스 없이 반으로·구석으로·다른 모니터로 옮길 수 있습니다.
 
 <p align="center">
-  <img src="assets/screenshots/settings-automatic.png" alt="Zap Settings in Automatic mode" width="92%">
+  <img src="assets/screenshots/settings-apps.png" alt="Zap 설정의 Apps 페이지" width="92%">
 </p>
 <p align="center">
-  <img src="assets/screenshots/settings-window-management.png" alt="Zap Settings in Window Management mode" width="92%">
+  <img src="assets/screenshots/settings-windows.png" alt="Zap 설정의 Windows 페이지" width="92%">
 </p>
 
-## Install
+## 설치
 
-Download `Zap-<version>.dmg` from the [latest release](https://github.com/woosublee/zap/releases/latest), open it, and drag `Zap.app` to `/Applications`.
+1. [최신 릴리스](https://github.com/woosublee/zap/releases/latest)에서 `Zap-<버전>.dmg`를 내려받습니다.
+2. DMG를 열고 `Zap.app`을 `응용 프로그램` 폴더로 드래그합니다.
+3. Zap을 실행하면 메뉴 막대에 아이콘이 나타납니다.
 
-Zap 1.0.0 and later are signed with a Developer ID certificate and notarized by Apple, so macOS opens Zap without a Gatekeeper warning. Zap checks for updates automatically and can also check from **Check for Updates** in the menu bar menu or Settings > General.
+Zap은 Apple의 공증을 받은 앱이라 경고 없이 바로 열립니다. 새 버전이 나오면 자동으로 알려 줍니다.
 
-If you are updating from Zap 0.1.11 or earlier, macOS asks you to grant Accessibility access to Zap again once, because earlier builds used a different signing certificate. If window shortcuts stop working after the update, remove Zap from System Settings > Privacy & Security > Accessibility and add it again.
+macOS 13 Ventura 이상에서 동작합니다.
 
-## Recent updates
+## 기능
 
-- Simplified Settings into General, Apps, and Windows pages. About moved to **About Zap** in the menu bar menu.
-- Zap 1.0.0 is the first Developer ID signed and notarized release.
-- Added Window Management shortcuts for centering, fullscreen, halves, corners, thirds, resizing, display movement, undo, and redo.
-- Reworked Settings into a sidebar with Automatic, Manual, Window Management, General, and About pages.
-- Updated the menu bar experience with native Quick Launch and Window Control menus.
+### Dock 앱 단축키
 
-## What Zap does
+Dock에 고정한 앱 중 앞에서부터 9개가 숫자 키에 자동으로 연결됩니다.
 
-Zap combines app launching and window control.
+- `⌥1`: Dock의 첫 번째 앱을 열거나 앞으로 가져옵니다.
+- `⌥2`: 두 번째 앱. 이렇게 `⌥9`까지 이어집니다.
 
-### Automatic Dock shortcuts
+Dock 순서를 바꾸면 단축키도 그 순서를 따라갑니다. 함께 누를 키는 **설정 > Apps**에서 `⌘` `⌃` `⌥` `⇧` 중 원하는 조합으로 바꿀 수 있습니다.
 
-Automatic mode reads the apps pinned to your macOS Dock and maps the first nine apps to number keys.
+### 나만의 앱 단축키
 
-For example, if the Dock shortcut modifier is set to `⌥`:
+Dock에 없는 앱이나 숫자보다 외우기 쉬운 단축키가 필요한 앱은 **설정 > Apps > Custom Apps**에서 직접 추가하세요. 앱마다 원하는 단축키를 지정하고, 언제든 끄거나 바꾸거나 지울 수 있습니다.
 
-- `⌥1` opens or focuses the first pinned Dock app.
-- `⌥2` opens or focuses the second pinned Dock app.
-- The mapping continues through `⌥9`.
+### 창 관리
 
-You can choose the modifier keys used with the number shortcuts from Settings. Zap supports `⌘`, `⌃`, `⌥`, and `⇧` combinations.
+맨 앞에 있는 창을 단축키 하나로 옮기고 크기를 바꿉니다. 기본 단축키는 다음과 같고, **설정 > Windows**에서 하나씩 바꾸거나 끌 수 있습니다.
 
-### Manual app shortcuts
+| 동작 | 기본 단축키 |
+| --- | --- |
+| 가운데 | `⌥⌘C` |
+| 전체 화면 크기 | `⌥⌘F` |
+| 왼쪽 / 오른쪽 절반 | `⌥⌘←` / `⌥⌘→` |
+| 위 / 아래 절반 | `⌥⌘↑` / `⌥⌘↓` |
+| 왼쪽 위 / 오른쪽 위 | `⌃⌘←` / `⌃⌘→` |
+| 왼쪽 아래 / 오른쪽 아래 | `⌃⇧⌘←` / `⌃⇧⌘→` |
+| 이전 / 다음 3분의 1 | `⌃⌥←` / `⌃⌥→` |
+| 작게 / 크게 | `⌃⌥⇧←` / `⌃⌥⇧→` |
+| 이전 / 다음 모니터 | `⌃⌥⌘←` / `⌃⌥⌘→` |
+| 실행 취소 / 다시 실행 | `⌥⌘Z` / `⌥⇧⌘Z` |
 
-Manual mode lets you add apps directly and assign custom global shortcuts to them.
+창 관리를 쓰려면 macOS의 **손쉬운 사용** 권한이 필요합니다. 아래 [처음 설정하기](#처음-설정하기)를 참고하세요.
 
-This is useful when:
+### Finder 단축키
 
-- an app is not pinned to your Dock;
-- you want a more memorable shortcut for a specific app;
-- you want a shortcut that is separate from the automatic Dock order.
+`⌥` + `` ` `` 키로 Finder를 엽니다. 함께 누르는 키는 Dock 앱 단축키 설정을 따릅니다. Dock에서 Finder를 클릭한 것처럼 동작합니다. 한글 입력 상태에서는 같은 자리의 `₩` 키로 표시되지만, 실제 키 위치를 기준으로 하므로 한/영 상태와 상관없이 동작합니다. **설정 > Apps**에서 켜고 끌 수 있습니다.
 
-Manual shortcuts can be enabled, disabled, re-recorded, or removed at any time.
+### 특정 앱에서 Zap 잠시 끄기
 
-### Window Management shortcuts
+Zap 단축키가 다른 앱의 단축키와 겹친다면, **설정 > General**에서 "Toggle Zap for Current App" 단축키를 지정해 두세요. 지금 쓰고 있는 앱에서만 Zap 단축키를 껐다 켤 수 있습니다.
 
-Window Management moves and resizes the frontmost window with customizable global shortcuts. The default set includes:
+## 처음 설정하기
 
-- `⌥⌘C` to center the active window;
-- `⌥⌘F` to make it fullscreen;
-- `⌥⌘←`, `⌥⌘→`, `⌥⌘↑`, and `⌥⌘↓` for half-screen layouts;
-- corner placement shortcuts;
-- previous and next display shortcuts;
-- previous and next third shortcuts;
-- larger and smaller resize shortcuts;
-- undo and redo for window layout changes.
+- **창 관리 권한:** 창 단축키를 쓰려면 **시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용**에서 Zap을 허용해야 합니다. 권한이 없으면 **설정 > Windows**에 **Grant…** 버튼이 나타나니 눌러서 허용하세요. Dock 앱 단축키와 나만의 앱 단축키는 권한 없이도 동작합니다.
+- **로그인 시 실행:** **설정 > General**에서 켜 두면 Mac을 켤 때 Zap이 자동으로 실행됩니다.
 
-Window Management requires macOS Accessibility permission so Zap can move and resize other apps' windows. If permission has not been granted yet, Zap shows a **Grant…** button on the Windows page and locks the window shortcuts until access is available. Dock and custom app shortcuts work without it.
+## 메뉴 막대
 
-### Finder shortcut
+메뉴 막대 아이콘을 누르면 다음 기능을 바로 쓸 수 있습니다.
 
-Zap includes an optional Finder shortcut. When enabled, `⌥` plus the physical `₩` / `` ` `` key opens Finder using behavior similar to clicking Finder in the Dock.
+- **Quick Launch:** Finder, 나만의 앱, Dock 앱 바로 열기
+- **Window Control:** 창 관리 동작 실행
+- Dock 앱 목록 새로고침, 업데이트 확인, Zap 정보, 설정, 종료
 
-The displayed key follows your current input source:
+메뉴 막대 아이콘을 숨기면 Zap은 Dock에 나타나고, Dock 아이콘을 누르면 설정 창이 열립니다.
 
-- English input source: `` ` ``
-- Korean input source: `₩`
+## 개인정보
 
-The shortcut is based on the physical key, so it continues to work across Korean and English input states.
+Zap은 Mac 안에서만 동작합니다. 서버를 쓰지 않고, 사용 기록을 수집하지 않으며, 앱 목록이나 창 정보, 단축키 설정을 어디에도 보내지 않습니다. 설정은 Mac에만 저장됩니다.
 
-## Menu bar and Dock behavior
+손쉬운 사용 권한은 다른 앱의 창을 옮기고 크기를 바꾸는 데만 쓰입니다.
 
-By default, Zap runs as a menu bar app.
+## 문제 해결
 
-The native menu bar menu includes:
+- **창 단축키가 동작하지 않아요.** **시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용**에서 Zap이 켜져 있는지 확인하세요. 켜져 있는데도 안 된다면 목록에서 Zap을 지웠다가 다시 추가하세요. Zap 0.1.11 이하에서 업데이트한 경우 이 과정을 한 번 거쳐야 합니다.
+- **단축키가 등록되지 않아요.** macOS나 다른 앱이 이미 같은 단축키를 쓰고 있을 수 있습니다. 이 경우 설정 창 위쪽에 오류가 표시되니 다른 단축키로 바꿔 주세요.
+- **일부 앱의 창이 원하는 크기로 바뀌지 않아요.** 최소·최대 크기를 정해 둔 앱은 macOS가 허용하는 범위까지만 조절됩니다.
 
-- Quick Launch for Finder, manual app shortcuts, and Dock number shortcuts;
-- Window Control for Window Management actions;
-- Refresh Dock Apps;
-- Check for Updates;
-- About Zap;
-- Settings;
-- Quit.
+## 개발자용
 
-If you hide the menu bar icon, Zap switches to a regular Dock app so Settings is still reachable. Clicking the Dock icon opens the Settings window.
-
-## Settings
-
-Zap Settings is organized into three sidebar pages. Settings reopens on the page you last used.
-
-### General
-
-Use General to record the shortcut that turns Zap on or off for the current app, enable or disable launch at login, show or hide the menu bar icon, and check for updates. The sidebar also shows the current version.
-
-### Apps
-
-Use Apps to choose the modifier keys for Dock number shortcuts, turn the Finder shortcut on or off, refresh and review the Dock app mapping, and manage custom app shortcuts: add apps, record shortcuts, enable or disable them, and remove them.
-
-### Windows
-
-Use Windows to enable or disable window shortcuts, review shortcuts by category, record custom shortcuts for each action, and reset shortcuts to their defaults. Window shortcuts need Accessibility permission. Until it is granted, Windows shows a **Grant…** button and the sidebar marks Windows with a warning icon. Dock and custom app shortcuts work without it.
-
-Dock, custom app, and window shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Zap shows a registration error at the top of Settings.
-
-## Privacy and permissions
-
-Zap runs locally on your Mac.
-
-It does not use a server, does not collect analytics, and does not send your app list, window information, or shortcut settings anywhere. App and shortcut settings are stored locally with `UserDefaults`.
-
-Window Management uses macOS Accessibility APIs to move and resize other apps' windows. Granting Accessibility permission only enables local window-control behavior for Zap; it does not change Zap's data collection behavior.
-
-## Cutting an automatic-update release
-
-Automatic-update releases are built by the **Notarized Release** GitHub Actions workflow and published as GitHub Release assets. The app checks the Sparkle feed at:
-
-```text
-https://github.com/woosublee/zap/releases/latest/download/appcast.xml
-```
-
-Releases are signed with the `Developer ID Application: Woosub Lee (2L6ZW98RCP)` identity using the hardened runtime and a secure timestamp. The app is notarized and stapled before it is packaged, then the DMG is signed, notarized, stapled, and checked with Gatekeeper. The Sparkle EdDSA signature in `appcast.xml` is generated last, from the stapled DMG.
-
-Zap 0.1.11 and earlier were signed with a self-signed `zap` certificate. Sparkle accepts the change of code-signing identity because the EdDSA key (`SUPublicEDKey` in `Info.plist`) is unchanged, so those installs update normally. macOS ties Accessibility access to the signing identity, so existing users grant Accessibility access to Zap again once after that update. Never rotate the Sparkle key and the signing identity in the same release.
-
-The release workflow requires these GitHub Secrets:
-
-- `DEVELOPER_ID_CERTIFICATE_BASE64`: base64-encoded `.p12` with the Developer ID Application certificate and its private key.
-- `DEVELOPER_ID_CERTIFICATE_PASSWORD`: password for that `.p12`.
-- `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64`: App Store Connect API key used by `notarytool`.
-- `SPARKLE_PRIVATE_KEY`: Sparkle EdDSA private key for signing `appcast.xml`.
-
-The committed Sparkle public key lives in `Info.plist` as `SUPublicEDKey`. The private key, `.p12`, and `.p8` must not be committed.
-
-Use the canonical Keychain item for the Sparkle private key:
-
-```zsh
-make generate-eddsa-key
-make check-eddsa-key
-```
-
-If you already have the Sparkle private key in a file, copy it into the canonical item instead of generating a new public key:
-
-```zsh
-security add-generic-password \
-  -U \
-  -s "https://sparkle-project.org" \
-  -a "com.woosublee.Zap.sparkle.ed25519" \
-  -l "Private key for signing Sparkle updates" \
-  -D "private key" \
-  -j "Public key (SUPublicEDKey value) for this key is:\n\n$(plutil -extract SUPublicEDKey raw Info.plist)" \
-  -w "$(cat build/sparkle_private_key.txt)"
-```
-
-Export the Developer ID Application identity from Keychain Access as a `.p12`, then register the GitHub Secrets from the local machine:
-
-```zsh
-DEVELOPER_ID_CERTIFICATE_P12=/path/to/developer-id.p12 \
-DEVELOPER_ID_CERTIFICATE_PASSWORD=... \
-ASC_ISSUER_ID=... \
-scripts/register-release-secrets.sh
-```
-
-The script validates the `.p12` and the Sparkle private key, reads the API key from `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8` (override with `ASC_KEY_PATH` and `ASC_KEY_ID`), registers the secrets with `gh secret set`, and deletes the retired `ZAP_CERTIFICATE_BASE64` and `ZAP_CERTIFICATE_PASSWORD` secrets. It does not print the secret values.
-
-Before running the workflow, update the version and build number in both `Info.plist` and `Makefile`. The workflow rejects releases when `make -s print-app-version`, `make -s print-build-number`, `make -s print-build-tag`, and the workflow input tag disagree.
-
-Run the **Notarized Release** GitHub Actions workflow with a new tag such as `v1.2.3`. Do not create the tag first; the workflow checks that the remote tag does not already exist, builds from the workflow commit, signs and notarizes the app and DMG, generates `dist/appcast.xml`, creates the tag, and uploads both release assets:
-
-- `Zap-<version>.dmg`
-- `appcast.xml`
-
-### Local fallback release
-
-Local fallback releases require the Developer ID Application identity in the local Keychain and a `notarytool` keychain profile (`woosublee-notary` by default, override with `NOTARY_PROFILE`):
-
-```zsh
-security find-identity -v -p codesigning | grep "Developer ID Application"
-xcrun notarytool store-credentials woosublee-notary --key <AuthKey.p8> --key-id <ASC_KEY_ID> --issuer <ASC_ISSUER_ID>
-```
-
-The fallback script validates the `v*` tag and the signing and notarization credentials, reads the version metadata from `Makefile`, builds, signs, notarizes, and verifies the DMG, generates `dist/appcast.xml` using the Keychain Sparkle private key, and uploads both release assets with the authenticated `gh` CLI:
-
-```zsh
-scripts/release-local.sh v1.2.3
-```
-
-By default, the fallback script does not clobber existing GitHub Release assets. Set `ALLOW_LOCAL_RELEASE_CLOBBER=1` only when you intentionally want to replace the DMG and appcast for an existing release.
-
-## Notes
-
-- Requires macOS 13 or later.
-- Dock shortcuts depend on the current pinned Dock app order.
-- Global shortcuts may conflict with shortcuts registered by macOS or other apps.
-- Manual shortcuts are local to the current macOS user account.
-- Window Management shortcuts require Accessibility permission.
-- Some apps may limit how far macOS lets Zap move or resize their windows.
+릴리스 절차는 [docs/RELEASING.md](docs/RELEASING.md)를 참고하세요.
