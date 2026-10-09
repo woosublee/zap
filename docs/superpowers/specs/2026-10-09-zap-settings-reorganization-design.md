@@ -84,7 +84,8 @@ enum AppDistribution {
 - 화면별로 들어가는 메시지:
   - 모든 화면: `model.registrationError`
   - Windows: 여기에 더해 `windowManagementModel.shortcutRegistrationError`, `windowManagementModel.windowManagementError`
-- 같은 문자열이 두 번 들어가면 한 번만 표시한다.
+- 같은 문자열은 한 번만 표시하고, `nil`이나 빈 문자열은 생략한다.
+- Windows 화면의 배너는 `WindowManagementSettingsView`가 직접 렌더링한다. `SettingsView`는 `ZapAppModel`만 관찰하기 때문에 `windowManagementModel`의 `@Published` 오류 값이 바뀌어도 다시 그려지지 않는다. General과 Apps 화면의 배너는 `SettingsView`가 렌더링한다.
 - 기존 각 카드 안의 `registrationError` 라벨들과 `WindowManagementSettingsView.shortcutErrorMessages`는 제거한다.
 - 목업에 있던 "Show in list" 링크는 이번 범위에서 제외한다.
 
@@ -107,11 +108,13 @@ enum AppDistribution {
 
 ## 7. Windows 화면
 
-- 카드 제목을 `Shortcuts`에서 `Window Shortcuts`로 바꾸고 부제는 제거한다. 제목 줄에 전역 enable 스위치를 두고, 오른쪽 끝에 `Reset to Defaults` 버튼을 둔다.
+- 카드 제목을 `Shortcuts`에서 `Window Shortcuts`로 바꾸고 부제는 제거한다.
+- 제목 줄 오른쪽에 전역 enable 스위치와 `Reset to Defaults` 버튼을 나란히 둔다. 스위치는 라벨을 숨기고, 접근성 라벨은 "Enable window management shortcuts"로 유지한다.
+- 이를 위해 `SettingsCard`에 제목 줄 오른쪽 `accessory` 슬롯을 추가한다. Apps 화면의 `Refresh`, `Add App…` 버튼도 이 슬롯을 쓴다.
 - 권한 잠금 안내 문구는 "Grant \(AccessibilityPaneName.current) in General to use window shortcuts."로 바꾸고 위치는 유지한다.
 - 카테고리 그룹은 2열 `LazyVGrid`를 버리고 **단일 열 목록**으로 바꾼다. 행 사이는 구분선으로 나누고 행 배경 박스는 제거한다.
 - 카테고리 제목은 caption 크기, 대문자, secondary 색으로 표시한다.
-- `WindowShortcutRowView`의 동작(keycap 클릭 → 녹화, 스위치 → 활성/비활성, 잠금 시 비활성)은 그대로 둔다. 이름 텍스트는 `lineLimit(1)`을 유지하되 단일 열이라 잘리지 않아야 한다.
+- `WindowShortcutRowView`는 바꾸지 않는다. keycap을 클릭하면 녹화하고, 체크 아이콘 버튼으로 활성/비활성을 바꾸고, 권한이 없으면 잠긴다. 목업에서 스위치로 그린 부분은 기존 체크 아이콘 버튼을 그대로 쓴다. 이름 텍스트는 `lineLimit(1)`을 유지하되 단일 열이라 잘리지 않아야 한다.
 
 ## 8. Keycap 표시
 
