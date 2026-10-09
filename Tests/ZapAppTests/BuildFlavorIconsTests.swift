@@ -77,25 +77,38 @@ final class BuildFlavorIconsTests: XCTestCase {
         XCTAssertNil(BuildFlavorIcons.appIcon(base: try appBaseIcon(), flavor: .official))
     }
 
-    func testDevelopmentAppIconAddsOrangeBorder() throws {
+    func testDevelopmentAppIconAddsOrangeBorderOnTheIconEdge() throws {
         let base = try appBaseIcon()
         let icon = try XCTUnwrap(BuildFlavorIcons.appIcon(base: base, flavor: .development))
         let bitmap = try render(icon, pixels: 256)
+        let orange = try XCTUnwrap(BuildFlavorIcons.developmentBorderColor.usingColorSpace(.sRGB))
 
         XCTAssertEqual(icon.size, base.size)
-        // Middle of the left edge of Apple's 824/1024 icon grid, on the border stroke.
-        let color = try XCTUnwrap(bitmap.colorAt(x: Int(256 * 102.0 / 1024.0), y: 128)?.usingColorSpace(.sRGB))
-        XCTAssertGreaterThan(color.redComponent, 0.85)
-        XCTAssertGreaterThan(color.greenComponent, 0.35)
-        XCTAssertLessThan(color.greenComponent, 0.75)
-        XCTAssertLessThan(color.blueComponent, 0.3)
+        // Zap.icns fills the whole canvas, so the border hugs the outer edge...
+        let edge = try XCTUnwrap(bitmap.colorAt(x: 2, y: 128)?.usingColorSpace(.sRGB))
+        XCTAssertEqual(edge.redComponent, orange.redComponent, accuracy: 0.08)
+        XCTAssertEqual(edge.greenComponent, orange.greenComponent, accuracy: 0.08)
+        XCTAssertEqual(edge.blueComponent, orange.blueComponent, accuracy: 0.08)
+        // ...and does not paint a second rounded rectangle inside the artwork.
+        let inside = try XCTUnwrap(bitmap.colorAt(x: Int(256 * 102.0 / 1024.0), y: 128)?.usingColorSpace(.sRGB))
+        XCTAssertLessThan(inside.redComponent, 0.4)
     }
 
-    func testZapAppUsesFlavorIcons() throws {
-        let source = try String(contentsOf: packageRootURL.appendingPathComponent("Sources/ZapApp/ZapApp.swift"))
+    func testDevelopmentBorderColorIsFixedSRGBOrange() throws {
+        let color = try XCTUnwrap(BuildFlavorIcons.developmentBorderColor.usingColorSpace(.sRGB))
+        XCTAssertEqual(color.redComponent, 1, accuracy: 0.01)
+        XCTAssertEqual(color.greenComponent, 0.584, accuracy: 0.01)
+        XCTAssertEqual(color.blueComponent, 0, accuracy: 0.01)
+    }
 
-        XCTAssertTrue(source.contains("BuildFlavorIcons.menuBarIcon(flavor: AppBuildFlavor.current)"))
-        XCTAssertTrue(source.contains("if let icon = BuildFlavorIcons.appIcon(base: NSApplication.shared.applicationIconImage, flavor: AppBuildFlavor.current) {\n            NSApplication.shared.applicationIconImage = icon\n        }"))
+    func testAppIconIsAppliedAfterLaunchFinishes() throws {
+        let app = try String(contentsOf: packageRootURL.appendingPathComponent("Sources/ZapApp/ZapApp.swift"))
+        let delegate = try String(contentsOf: packageRootURL.appendingPathComponent("Sources/ZapApp/Services/ZapApplicationDelegate.swift"))
+
+        XCTAssertTrue(app.contains("BuildFlavorIcons.menuBarIcon(flavor: AppBuildFlavor.current)"))
+        XCTAssertFalse(app.contains("BuildFlavorIcons.appIcon("))
+        XCTAssertTrue(delegate.contains("func applicationDidFinishLaunching("))
+        XCTAssertTrue(delegate.contains("BuildFlavorIcons.appIcon("))
     }
 
     // MARK: - Helpers

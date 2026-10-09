@@ -81,8 +81,14 @@ enum BuildFlavorIcons {
         return path
     }
 
-    /// Development builds get the bundled icon with an orange border on Apple's
-    /// 824/1024 icon grid. Official builds return nil and keep the bundle icon.
+    /// Fixed sRGB orange so the border (and its tests) do not shift with
+    /// appearance or Increase Contrast, as `NSColor.systemOrange` does.
+    static let developmentBorderColor = NSColor(srgbRed: 1, green: 0.584, blue: 0, alpha: 1)
+
+    /// Development builds get the bundled icon with an orange border along its
+    /// outer edge. Zap.icns fills the whole canvas with ~230/1024 rounded corners,
+    /// so the border follows that shape. Official builds return nil and keep the
+    /// bundle icon.
     static func appIcon(base: NSImage, flavor: AppBuildFlavor) -> NSImage? {
         guard flavor == .development else { return nil }
 
@@ -90,13 +96,12 @@ enum BuildFlavorIcons {
             base.draw(in: rect)
 
             let scale = rect.width / 1024
-            let lineWidth = 36 * scale
-            let tile = rect.insetBy(dx: 100 * scale, dy: 100 * scale)
-                .insetBy(dx: lineWidth / 2, dy: lineWidth / 2)
-            let radius = 185 * scale - lineWidth / 2
+            let lineWidth = 40 * scale
+            let tile = rect.insetBy(dx: lineWidth / 2, dy: lineWidth / 2)
+            let radius = 230 * scale - lineWidth / 2
             let border = NSBezierPath(roundedRect: tile, xRadius: radius, yRadius: radius)
             border.lineWidth = lineWidth
-            NSColor.systemOrange.setStroke()
+            developmentBorderColor.setStroke()
             border.stroke()
             return true
         }

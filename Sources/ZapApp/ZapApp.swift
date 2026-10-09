@@ -11,9 +11,6 @@ struct ZapApp: App {
     init() {
         let savedValue = UserDefaults.standard.object(forKey: "show_menu_bar_icon") as? Bool ?? true
         AppActivationPolicy.apply(showMenuBarIcon: savedValue)
-        if let icon = BuildFlavorIcons.appIcon(base: NSApplication.shared.applicationIconImage, flavor: AppBuildFlavor.current) {
-            NSApplication.shared.applicationIconImage = icon
-        }
 
         let updateService = UpdateService()
         _updateService = StateObject(wrappedValue: updateService)
