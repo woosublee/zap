@@ -17,12 +17,12 @@ final class SettingsShortcutControlsUITests: XCTestCase {
         }
     }
 
-    func testGeneralPlacesShortcutControlsBetweenPermissionsAndBehavior()
+    func testGeneralStartsWithShortcutControlsThenBehavior()
         throws {
         let source = try settingsSource
 
         XCTAssertTrue(source.contains(
-            "            permissionsSection\n            shortcutControlsSection\n            behaviorSection"
+            "VStack(alignment: .leading, spacing: ZapSpacing.large) {\n            shortcutControlsSection\n            behaviorSection"
         ))
         XCTAssertTrue(source.contains(
             "SettingsCard(title: \"Shortcut Controls\")"

@@ -44,10 +44,9 @@
 
 카드 순서:
 
-1. **Permissions**: Accessibility 행. 기존 동작 유지(권한 있음 `✓ Granted`, 없음 `Grant…` 버튼). 부제는 "Required for window shortcuts and per-app toggling."으로 바꾼다.
-2. **Shortcut Controls**: "Toggle Zap for Current App" 행. 기존 keycap 녹화 버튼과 `Clear` 버튼을 유지한다. 이 카드 안에 있던 `registrationError` 표시는 제거한다(5절 배너로 이동).
-3. **Behavior**: `Launch at login`, `Show menu bar icon`. `loginItemError`는 이 카드 안 inline으로 유지한다(로그인 항목 토글에만 해당하는 오류이기 때문).
-4. **Updates**: `Automatically check for updates` 토글과 `Check Now` 버튼. Sparkle/EdDSA 설명 문구는 제거한다.
+1. **Shortcut Controls**: "Toggle Zap for Current App" 행. 기존 keycap 녹화 버튼과 `Clear` 버튼을 유지한다. 이 카드 안에 있던 `registrationError` 표시는 제거한다(5절 배너로 이동).
+2. **Behavior**: `Launch at login`, `Show menu bar icon`. `loginItemError`는 이 카드 안 inline으로 유지한다(로그인 항목 토글에만 해당하는 오류이기 때문).
+3. **Updates**: `Automatically check for updates` 토글과 `Check Now` 버튼. Sparkle/EdDSA 설명 문구는 제거한다.
    - `AppDistribution.current.supportsInAppUpdates`가 `false`이면 카드 전체를 렌더링하지 않는다.
 
 ### AppDistribution
@@ -111,7 +110,10 @@ enum AppDistribution {
 - 카드 제목을 `Shortcuts`에서 `Window Shortcuts`로 바꾸고 부제는 제거한다.
 - 제목 줄 오른쪽에 전역 enable 스위치와 `Reset to Defaults` 버튼을 나란히 둔다. 스위치는 라벨을 숨기고, 접근성 라벨은 "Enable window management shortcuts"로 유지한다.
 - 이를 위해 `SettingsCard`에 제목 줄 오른쪽 `accessory` 슬롯을 추가한다. Apps 화면의 `Refresh`, `Add App…` 버튼도 이 슬롯을 쓴다.
-- 권한 잠금 안내 문구는 "Grant \(AccessibilityPaneName.current) in General to use window shortcuts."로 바꾸고 위치는 유지한다.
+- 손쉬운 사용 권한은 창 관리에만 필요하다(전역 단축키 등록과 앱 실행은 권한 없이 동작). 그래서 권한 UI는 General이 아니라 Windows에 둔다.
+  - 권한이 없을 때만 카드 맨 위에 권한 행을 표시한다: 자물쇠 아이콘, 제목 `AccessibilityPaneName.current`, 부제 "Required to move and resize windows.", 오른쪽 `Grant…` 버튼(기존과 같은 `requestAccessibilityPermission(sourceFrame: .atMouse)` 후 새로고침).
+  - 권한이 있으면 행을 숨긴다(상태 표시 없음).
+  - 권한이 없으면 사이드바 Windows 항목 오른쪽에 주황색 `exclamationmark.circle.fill`을 표시한다. 이 배지는 `WindowManagementModel`을 직접 관찰하는 뷰로 만든다.
 - 카테고리 그룹은 2열 `LazyVGrid`를 버리고 **단일 열 목록**으로 바꾼다. 행 사이는 구분선으로 나누고 행 배경 박스는 제거한다.
 - 카테고리 제목은 caption 크기, 대문자, secondary 색으로 표시한다.
 - `WindowShortcutRowView`는 바꾸지 않는다. keycap을 클릭하면 녹화하고, 체크 아이콘 버튼으로 활성/비활성을 바꾸고, 권한이 없으면 잠긴다. 목업에서 스위치로 그린 부분은 기존 체크 아이콘 버튼을 그대로 쓴다. 이름 텍스트는 `lineLimit(1)`을 유지하되 단일 열이라 잘리지 않아야 한다.

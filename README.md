@@ -105,7 +105,7 @@ Zap Settings is organized into three sidebar pages. Settings reopens on the page
 
 ### General
 
-Use General to grant Accessibility permission, record the shortcut that turns Zap on or off for the current app, enable or disable launch at login, show or hide the menu bar icon, and check for updates. The sidebar also shows the current version.
+Use General to record the shortcut that turns Zap on or off for the current app, enable or disable launch at login, show or hide the menu bar icon, and check for updates. The sidebar also shows the current version.
 
 ### Apps
 
@@ -113,7 +113,7 @@ Use Apps to choose the modifier keys for Dock number shortcuts, turn the Finder 
 
 ### Windows
 
-Use Windows to enable or disable window shortcuts, review shortcuts by category, record custom shortcuts for each action, and reset shortcuts to their defaults. Window shortcuts stay locked until Accessibility permission is granted in General.
+Use Windows to enable or disable window shortcuts, review shortcuts by category, record custom shortcuts for each action, and reset shortcuts to their defaults. Window shortcuts need Accessibility permission. Until it is granted, Windows shows a **Grant…** button and the sidebar marks Windows with a warning icon. Dock and custom app shortcuts work without it.
 
 Dock, custom app, and window shortcuts can be used together. If a shortcut conflicts with another registered shortcut, Zap shows a registration error at the top of Settings.
 

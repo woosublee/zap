@@ -108,28 +108,32 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains(".padding(.vertical, 8)\n            .frame(maxWidth: .infinity, alignment: .leading)\n            .contentShape(Rectangle())\n            .background("))
     }
 
-    func testGeneralSectionOwnsPermissionsBehaviorAndUpdates() throws {
+    func testGeneralSectionOwnsShortcutControlsBehaviorAndUpdatesButNotPermissions() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
         XCTAssertTrue(source.contains("private var generalSection: some View"))
-        XCTAssertTrue(source.contains("permissionsSection"))
-        XCTAssertTrue(source.contains("SettingsCard(title: \"Permissions\")"))
-        XCTAssertTrue(source.contains("title: AccessibilityPaneName.current"))
-        XCTAssertTrue(source.contains("Required for window shortcuts and per-app toggling."))
-        XCTAssertTrue(source.contains("Granted"))
-        XCTAssertTrue(source.contains("Button(\"Grant…\")"))
-        XCTAssertFalse(source.contains("Button(\"Request\")"))
-        XCTAssertTrue(source.contains("model.windowManagementModel.requestAccessibilityPermission(\n                                sourceFrame: PermissionGuideSourceFrame.atMouse\n                            )\n                            refreshAccessibilityPermission()"))
+        XCTAssertFalse(source.contains("permissionsSection"))
+        XCTAssertFalse(source.contains("SettingsCard(title: \"Permissions\")"))
+        XCTAssertFalse(source.contains("Button(\"Grant…\")"))
         XCTAssertTrue(source.contains(".onAppear {\n            refreshAccessibilityPermission()\n        }"))
         XCTAssertTrue(source.contains("NSApplication.didBecomeActiveNotification"))
         XCTAssertTrue(source.contains("model.windowManagementModel.refreshAccessibilityPermission()"))
-        XCTAssertFalse(source.contains("Text(\"Required\")"))
-        XCTAssertFalse(source.contains("Label(\"Required\""))
         XCTAssertTrue(source.contains("SettingsCard(title: \"Behavior\")"))
         XCTAssertTrue(source.contains("SettingsCard(title: \"Updates\")"))
         XCTAssertTrue(source.contains("if AppDistribution.current.supportsInAppUpdates {\n                updatesSection\n            }"))
         XCTAssertTrue(source.contains("case .general:\n                        SettingsIssueBanner(messages: [model.registrationError])\n                        generalSection"))
+    }
+
+    func testWindowsSidebarItemWarnsWhenAccessibilityIsMissing() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains("private struct AccessibilityWarningBadge: View {\n    @ObservedObject var model: WindowManagementModel"))
+        XCTAssertTrue(source.contains("if !model.accessibilityTrusted {"))
+        XCTAssertTrue(source.contains("Image(systemName: \"exclamationmark.circle.fill\")"))
+        XCTAssertTrue(source.contains(".accessibilityLabel(\"Accessibility permission required\")"))
+        XCTAssertTrue(source.contains("if mode == .windows {\n                        AccessibilityWarningBadge(model: model.windowManagementModel)\n                    }"))
     }
 
     func testSettingsBodyDoesNotAppendBehaviorAndUpdatesToEveryMode() throws {
@@ -325,7 +329,7 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("Button(\"Reset to Defaults\")"))
         XCTAssertFalse(source.contains(".disabled(!model.accessibilityTrusted)"))
         XCTAssertTrue(source.contains("isLocked: !model.accessibilityTrusted"))
-        XCTAssertTrue(source.contains("Grant \\(AccessibilityPaneName.current) in General to use window shortcuts."))
+        XCTAssertFalse(source.contains("in General to use window shortcuts."))
     }
 
     func testWindowsScreenShowsAllErrorsInOneBanner() throws {
@@ -338,5 +342,16 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("SettingsIssueBanner(messages: [\n                registrationError,\n                model.shortcutRegistrationError,\n                model.windowManagementError\n            ])"))
         XCTAssertFalse(source.contains("shortcutErrorMessages"))
         XCTAssertFalse(source.contains("Label(registrationError"))
+    }
+
+    func testWindowsScreenRequestsAccessibilityInPlaceOnlyWhenMissing() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/WindowManagementSettingsView.swift"))
+
+        XCTAssertTrue(source.contains("if !model.accessibilityTrusted {\n                accessibilityPermissionRow\n            }"))
+        XCTAssertTrue(source.contains("title: AccessibilityPaneName.current,"))
+        XCTAssertTrue(source.contains("subtitle: \"Required to move and resize windows.\","))
+        XCTAssertTrue(source.contains("Button(\"Grant…\") {\n                    model.requestAccessibilityPermission(\n                        sourceFrame: PermissionGuideSourceFrame.atMouse\n                    )\n                    model.refreshAccessibilityPermission()\n                }"))
+        XCTAssertFalse(source.contains("Granted"))
     }
 }

@@ -27,12 +27,7 @@ struct WindowManagementSettingsView: View {
     private var shortcutsSection: some View {
         SettingsCard(title: "Window Shortcuts") {
             if !model.accessibilityTrusted {
-                Label("Grant \(AccessibilityPaneName.current) in General to use window shortcuts.", systemImage: "lock.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                accessibilityPermissionRow
             }
 
             VStack(alignment: .leading, spacing: 14) {
@@ -76,6 +71,31 @@ struct WindowManagementSettingsView: View {
                 .controlSize(.small)
             }
         }
+    }
+
+    private var accessibilityPermissionRow: some View {
+        SettingsRow(
+            title: AccessibilityPaneName.current,
+            subtitle: "Required to move and resize windows.",
+            leading: {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.orange)
+                    .frame(width: 24)
+            },
+            trailing: {
+                Button("Grant…") {
+                    model.requestAccessibilityPermission(
+                        sourceFrame: PermissionGuideSourceFrame.atMouse
+                    )
+                    model.refreshAccessibilityPermission()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+        )
+        .padding(.horizontal, 10)
+        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var shortcutsByCategory: [WindowActionCategory: [WindowShortcut]] {

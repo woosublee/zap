@@ -142,9 +142,12 @@ struct SettingsView: View {
             ForEach(SettingsMode.allCases) { mode in
                 SettingsSidebarItem(
                     mode: mode,
-                    isSelected: selectedMode == mode
+                    isSelected: selectedMode == mode,
+                    action: { selectedMode = mode }
                 ) {
-                    selectedMode = mode
+                    if mode == .windows {
+                        AccessibilityWarningBadge(model: model.windowManagementModel)
+                    }
                 }
             }
 
@@ -177,43 +180,11 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: ZapSpacing.large) {
-            permissionsSection
             shortcutControlsSection
             behaviorSection
             if AppDistribution.current.supportsInAppUpdates {
                 updatesSection
             }
-        }
-    }
-
-    private var permissionsSection: some View {
-        SettingsCard(title: "Permissions") {
-            SettingsRow(
-                title: AccessibilityPaneName.current,
-                subtitle: "Required for window shortcuts and per-app toggling.",
-                leading: {
-                    Image(systemName: "hand.raised.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 24)
-                },
-                trailing: {
-                    if model.windowManagementModel.accessibilityTrusted {
-                        Label("Granted", systemImage: "checkmark.circle.fill")
-                            .font(.system(.callout, design: .default, weight: .semibold))
-                            .foregroundStyle(.green)
-                    } else {
-                        Button("Grant…") {
-                            model.windowManagementModel.requestAccessibilityPermission(
-                                sourceFrame: PermissionGuideSourceFrame.atMouse
-                            )
-                            refreshAccessibilityPermission()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-                }
-            )
         }
     }
 
@@ -410,10 +381,11 @@ enum SettingsMode: String, CaseIterable, Identifiable {
     }
 }
 
-private struct SettingsSidebarItem: View {
+private struct SettingsSidebarItem<Accessory: View>: View {
     let mode: SettingsMode
     let isSelected: Bool
     let action: () -> Void
+    @ViewBuilder let accessory: Accessory
 
     var body: some View {
         Button(action: action) {
@@ -425,6 +397,7 @@ private struct SettingsSidebarItem: View {
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                accessory
             }
             .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
             .padding(.horizontal, 10)
@@ -439,6 +412,20 @@ private struct SettingsSidebarItem: View {
         .buttonStyle(.plain)
         .accessibilityLabel(mode.title)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    }
+}
+
+private struct AccessibilityWarningBadge: View {
+    @ObservedObject var model: WindowManagementModel
+
+    var body: some View {
+        if !model.accessibilityTrusted {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.orange)
+                .help("Accessibility permission required")
+                .accessibilityLabel("Accessibility permission required")
+        }
     }
 }
 
