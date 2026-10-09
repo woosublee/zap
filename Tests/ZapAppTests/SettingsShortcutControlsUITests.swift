@@ -17,12 +17,12 @@ final class SettingsShortcutControlsUITests: XCTestCase {
         }
     }
 
-    func testGeneralPlacesShortcutControlsBetweenPermissionsAndBehavior()
+    func testGeneralStartsWithShortcutControlsThenBehavior()
         throws {
         let source = try settingsSource
 
         XCTAssertTrue(source.contains(
-            "            permissionsSection\n            shortcutControlsSection\n            behaviorSection"
+            "VStack(alignment: .leading, spacing: ZapSpacing.large) {\n            shortcutControlsSection\n            behaviorSection"
         ))
         XCTAssertTrue(source.contains(
             "SettingsCard(title: \"Shortcut Controls\")"
@@ -75,23 +75,18 @@ final class SettingsShortcutControlsUITests: XCTestCase {
         ))
     }
 
-    func testShortcutControlsDisplaysGlobalRegistrationError()
+    func testShortcutControlsLeavesRegistrationErrorToBanner()
         throws {
         let source = try settingsSource
         let sectionStart = try XCTUnwrap(source.range(
             of: "    private var shortcutControlsSection: some View {"
         ))
         let sectionEnd = try XCTUnwrap(source.range(
-            of: "    private var automaticShortcutsSection: some View {",
+            of: "    private var ",
             range: sectionStart.upperBound..<source.endIndex
         ))
         let sectionSource = String(source[sectionStart.lowerBound..<sectionEnd.lowerBound])
 
-        XCTAssertTrue(sectionSource.contains(
-            "if let registrationError = model.registrationError"
-        ))
-        XCTAssertTrue(sectionSource.contains(
-            "Label(registrationError, systemImage: \"exclamationmark.triangle.fill\")"
-        ))
+        XCTAssertFalse(sectionSource.contains("registrationError"))
     }
 }

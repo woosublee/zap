@@ -7,21 +7,40 @@ struct ZapSpacing {
     static let xLarge: CGFloat = 22
 }
 
-struct SettingsCard<Content: View>: View {
+struct SettingsCard<Accessory: View, Content: View>: View {
     let title: String
     var subtitle: String? = nil
-    @ViewBuilder let content: Content
+    let accessory: Accessory
+    let content: Content
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder accessory: () -> Accessory
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.content = content()
+        self.accessory = accessory()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: ZapSpacing.medium) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(.headline, design: .default, weight: .semibold))
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            HStack(alignment: .center, spacing: ZapSpacing.medium) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(.headline, design: .default, weight: .semibold))
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+
+                Spacer(minLength: ZapSpacing.medium)
+
+                accessory
             }
 
             content
@@ -33,6 +52,12 @@ struct SettingsCard<Content: View>: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
         )
+    }
+}
+
+extension SettingsCard where Accessory == EmptyView {
+    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+        self.init(title: title, subtitle: subtitle, content: content, accessory: { EmptyView() })
     }
 }
 
@@ -66,21 +91,39 @@ struct SettingsRow<Leading: View, Trailing: View>: View {
     }
 }
 
+enum ShortcutKeycapLabel {
+    static func display(_ label: String) -> String {
+        switch label {
+        case "Return": "↩"
+        case "Tab": "⇥"
+        case "Delete": "⌫"
+        case "Esc": "⎋"
+        default: label
+        }
+    }
+}
+
 struct ShortcutKeycapView: View {
     let label: String
     var isSelected = false
     var isDisabled = false
 
     var body: some View {
-        Text(label)
+        Text(displayLabel)
+            .lineLimit(1)
+            .fixedSize()
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .foregroundStyle(foregroundStyle)
             .frame(minWidth: 22, minHeight: 22)
-            .padding(.horizontal, label.count > 1 ? 7 : 0)
+            .padding(.horizontal, displayLabel.count > 1 ? 7 : 0)
             .background(backgroundShape)
             .overlay(borderShape)
             .opacity(isDisabled ? 0.55 : 1)
             .accessibilityLabel(label)
+    }
+
+    private var displayLabel: String {
+        ShortcutKeycapLabel.display(label)
     }
 
     private var foregroundStyle: Color {
@@ -144,5 +187,39 @@ struct ShortcutKeycapGroupView: View {
         }
 
         return output.isEmpty ? [shortcut] : output
+    }
+}
+
+struct SettingsIssueBanner: View {
+    let messages: [String]
+
+    init(messages: [String?]) {
+        self.messages = Self.uniqueMessages(messages)
+    }
+
+    static func uniqueMessages(_ messages: [String?]) -> [String] {
+        var seen = Set<String>()
+        return messages
+            .compactMap { $0 }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    var body: some View {
+        if !messages.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(messages, id: \.self) { message in
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.orange.opacity(0.25), lineWidth: 0.5)
+            )
+        }
     }
 }

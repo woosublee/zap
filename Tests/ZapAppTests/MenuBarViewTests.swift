@@ -77,7 +77,7 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertFalse(source.contains("openWindowManagementSettings"))
     }
 
-    func testMenuBarRemovesStatusAndAboutRows() throws {
+    func testMenuBarRemovesStatusRows() throws {
         let source = try menuBarSource
 
         XCTAssertFalse(source.contains("sectionLabel(\"Status\")"))
@@ -87,8 +87,6 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertFalse(source.contains("Ready"))
         XCTAssertFalse(source.contains("registrationError"))
         XCTAssertFalse(source.contains("windowManagementError"))
-        XCTAssertFalse(source.contains("AboutPresentation.aboutMenuLabel"))
-        XCTAssertFalse(source.contains("openAbout"))
     }
 
     func testMenuBarNoLongerUsesCustomWindowPanelRows() throws {
@@ -107,7 +105,23 @@ final class MenuBarViewTests: XCTestCase {
         XCTAssertTrue(source.contains(".menuBarExtraStyle(.menu)"))
         XCTAssertFalse(source.contains(".menuBarExtraStyle(.window)"))
         XCTAssertFalse(source.contains("openWindowManagementSettings:"))
-        XCTAssertFalse(source.contains("openAbout:"))
         XCTAssertFalse(source.contains("private func openAbout()"))
+    }
+
+    func testMenuBarOffersAboutBeforeSettings() throws {
+        let source = try menuBarSource
+        let app = try appSource
+
+        XCTAssertTrue(source.contains("let openAbout: () -> Void"))
+        XCTAssertTrue(source.contains("Button(AboutPresentation.aboutMenuLabel(appName: AboutPresentation.currentAppName)) {\n            openAbout()\n        }\n        Button(\"Settings...\")"))
+        XCTAssertTrue(app.contains("openAbout: { AboutWindowPresenter.open() },"))
+    }
+
+    func testUpdateItemsAppearOnlyForDirectDistribution() throws {
+        let source = try menuBarSource
+        let app = try appSource
+
+        XCTAssertTrue(source.contains("if AppDistribution.current.supportsInAppUpdates {\n            Button(\"Check for Updates...\")"))
+        XCTAssertTrue(app.contains("if AppDistribution.current.supportsInAppUpdates {\n                    Button(\"Check for Updates...\")"))
     }
 }
