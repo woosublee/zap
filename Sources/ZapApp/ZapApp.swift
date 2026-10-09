@@ -11,6 +11,9 @@ struct ZapApp: App {
     init() {
         let savedValue = UserDefaults.standard.object(forKey: "show_menu_bar_icon") as? Bool ?? true
         AppActivationPolicy.apply(showMenuBarIcon: savedValue)
+        if let icon = BuildFlavorIcons.appIcon(base: NSApplication.shared.applicationIconImage, flavor: AppBuildFlavor.current) {
+            NSApplication.shared.applicationIconImage = icon
+        }
 
         let updateService = UpdateService()
         _updateService = StateObject(wrappedValue: updateService)
@@ -52,7 +55,8 @@ struct ZapApp: App {
 
     @ViewBuilder
     private var menuBarIcon: some View {
-        if let image = NSImage(named: "ZapMenuBarIcon")?.templateCopy(pointSize: NSSize(width: 18, height: 18)) {
+        if let base = NSImage(named: "ZapMenuBarIcon") {
+            let image = BuildFlavorIcons.menuBarIcon(base: base, flavor: AppBuildFlavor.current)
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
@@ -78,16 +82,5 @@ struct ZapApp: App {
         Task { @MainActor in
             updateService.start()
         }
-    }
-}
-
-private extension NSImage {
-    func templateCopy(pointSize: NSSize) -> NSImage {
-        guard let copiedImage = copy() as? NSImage else {
-            return self
-        }
-        copiedImage.size = pointSize
-        copiedImage.isTemplate = true
-        return copiedImage
     }
 }
