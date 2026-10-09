@@ -57,9 +57,9 @@ struct SettingsView: View {
                         SettingsIssueBanner(messages: [model.registrationError])
                         generalSection
                     case .apps:
-                        automaticShortcutsSection
-                        automaticSection
-                        manualSection
+                        SettingsIssueBanner(messages: [model.registrationError])
+                        dockAppsSection
+                        customAppsSection
                     case .windows:
                         WindowManagementSettingsView(
                             model: model.windowManagementModel,
@@ -254,29 +254,9 @@ struct SettingsView: View {
         }
     }
 
-    private var automaticShortcutsSection: some View {
-        SettingsCard(title: "Shortcuts", subtitle: "Choose the global modifiers Zap uses for Dock and Finder actions.") {
-            dockModifierSelector
-
-            Toggle("Finder shortcut", isOn: $model.isFinderShortcutEnabled)
-                .toggleStyle(.switch)
-
-            if let registrationError = model.registrationError {
-                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        }
-    }
-
     private var dockModifierSelector: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Dock app shortcuts")
-                Text("Choose the modifier keys used with 1–9")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Modifier")
 
             Spacer()
 
@@ -290,31 +270,23 @@ struct SettingsView: View {
                     }
                 }
 
-                ShortcutKeycapView(label: "1–9")
+                Text("+ 1–9")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private var automaticSection: some View {
-        SettingsCard(title: "Automatic Dock Apps", subtitle: "Pinned Dock apps mapped to number keys.") {
-            HStack {
-                Text("Refresh the Dock when pinned apps change.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    model.refreshDockItems()
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .controlSize(.small)
-            }
+    private var dockAppsSection: some View {
+        SettingsCard(title: "Dock Apps", subtitle: "Your first nine pinned Dock apps, in order.") {
+            dockModifierSelector
 
             LazyVGrid(columns: automaticShortcutColumns, alignment: .leading, spacing: 8) {
                 ShortcutListRow(
                     shortcut: model.finderShortcutTitle,
                     title: "Finder",
-                    isDisabled: !model.isFinderShortcutEnabled
+                    isDisabled: !model.isFinderShortcutEnabled,
+                    isOn: $model.isFinderShortcutEnabled
                 )
 
                 ForEach(NumberKey.allCases) { key in
@@ -325,6 +297,13 @@ struct SettingsView: View {
                     )
                 }
             }
+        } accessory: {
+            Button {
+                model.refreshDockItems()
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .controlSize(.small)
         }
     }
 
@@ -361,14 +340,10 @@ struct SettingsView: View {
         }
     }
 
-    private var manualSection: some View {
-        SettingsCard(title: "Manual App Shortcuts", subtitle: "Add apps and assign custom global shortcuts.") {
-            Button("Add App Shortcut...") {
-                addManualShortcut()
-            }
-
+    private var customAppsSection: some View {
+        SettingsCard(title: "Custom Apps", subtitle: "Any app, any shortcut.") {
             if model.manualShortcuts.isEmpty {
-                Text("No manual shortcuts")
+                Text("No custom apps yet")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 18)
@@ -382,12 +357,11 @@ struct SettingsView: View {
                     remove: { model.removeManualShortcut(id: shortcut.id) }
                 )
             }
-
-            if let registrationError = model.registrationError {
-                Label(registrationError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+        } accessory: {
+            Button("Add App…") {
+                addManualShortcut()
             }
+            .controlSize(.small)
         }
     }
 
@@ -487,20 +461,32 @@ private struct ShortcutListRow: View {
     let title: String
     var isEmpty = false
     var isDisabled = false
+    var isOn: Binding<Bool>? = nil
 
     var body: some View {
         HStack(spacing: 8) {
-            ShortcutKeycapGroupView(shortcut: shortcut, isDisabled: isEmpty || isDisabled)
-                .frame(width: 80, alignment: .leading)
-            Text(title)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .foregroundStyle(isEmpty || isDisabled ? .secondary : .primary)
+            HStack(spacing: 8) {
+                ShortcutKeycapGroupView(shortcut: shortcut, isDisabled: isEmpty || isDisabled)
+                    .frame(width: 80, alignment: .leading)
+                Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(isEmpty || isDisabled ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .opacity(isDisabled ? 0.62 : 1)
+
+            if let isOn {
+                Toggle("", isOn: isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .accessibilityLabel("Finder shortcut")
+            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(isEmpty ? 0.025 : 0.045), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .opacity(isDisabled ? 0.62 : 1)
     }
 }
 

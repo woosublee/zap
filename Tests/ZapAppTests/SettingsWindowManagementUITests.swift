@@ -139,24 +139,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("case .windowManagement:\n                        WindowManagementSettingsView(model: model.windowManagementModel, registrationError: model.registrationError)\n                    }\n\n                    behaviorSection\n                    updatesSection"))
     }
 
-    func testAutomaticDockAppsAlwaysIncludesFinderWithDisabledVisualState() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-
-        XCTAssertFalse(source.contains("if model.isFinderShortcutEnabled {\n                    ShortcutListRow(shortcut: model.finderShortcutTitle, title: \"Finder\")\n                }"))
-        XCTAssertTrue(source.contains("ShortcutListRow(\n                    shortcut: model.finderShortcutTitle,\n                    title: \"Finder\",\n                    isDisabled: !model.isFinderShortcutEnabled\n                )"))
-        XCTAssertTrue(source.contains("var isDisabled = false"))
-    }
-
-    func testFinderShortcutUsesSwitchToggleStyle() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-
-        XCTAssertTrue(source.contains("Toggle(\"Finder shortcut\", isOn: $model.isFinderShortcutEnabled)"))
-        XCTAssertTrue(source.contains(".toggleStyle(.switch)"))
-        XCTAssertFalse(source.contains("Toggle(isOn: $model.isFinderShortcutEnabled) {\n                HStack(spacing: 8)"))
-    }
-
     func testManualShortcutRowsUseOneLineKeycapClickAndSwitchToggle() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
@@ -235,18 +217,6 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(source.contains("Button(\"Check Now\")"))
         XCTAssertFalse(source.contains("Check for Updates Now"))
         XCTAssertFalse(source.contains("Sparkle"))
-    }
-
-    func testAutomaticAndManualShortcutControlsRemainWired() throws {
-        let source = try String(contentsOf: packageRootURL
-            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
-
-        XCTAssertTrue(source.contains("automaticShortcutsSection"))
-        XCTAssertTrue(source.contains("Finder shortcut"))
-        XCTAssertTrue(source.contains("Dock app shortcuts"))
-        XCTAssertTrue(source.contains("manualSection"))
-        XCTAssertTrue(source.contains("ManualShortcutRow"))
-        XCTAssertTrue(source.contains("Add App Shortcut"))
     }
 
     func testWindowManagementSettingsViewContainsEnableResetAndShortcutRows() throws {
@@ -347,5 +317,47 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("if category == .positioning"))
         XCTAssertTrue(source.contains("LazyVGrid(columns: shortcutColumns"))
         XCTAssertFalse(source.contains("private let positioningColumns"))
+    }
+
+    func testAppsScreenCombinesDockAppsAndCustomApps() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains("case .apps:\n                        SettingsIssueBanner(messages: [model.registrationError])\n                        dockAppsSection\n                        customAppsSection"))
+        XCTAssertTrue(source.contains("SettingsCard(title: \"Dock Apps\", subtitle: \"Your first nine pinned Dock apps, in order.\")"))
+        XCTAssertTrue(source.contains("SettingsCard(title: \"Custom Apps\", subtitle: \"Any app, any shortcut.\")"))
+        XCTAssertTrue(source.contains("Button(\"Add App…\")"))
+        XCTAssertTrue(source.contains("Text(\"No custom apps yet\")"))
+        XCTAssertTrue(source.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
+        XCTAssertTrue(source.contains("Text(\"Modifier\")"))
+        XCTAssertTrue(source.contains("Text(\"+ 1–9\")"))
+        XCTAssertTrue(source.contains("ManualShortcutRow("))
+        XCTAssertFalse(source.contains("automaticShortcutsSection"))
+        XCTAssertFalse(source.contains("manualSection"))
+        XCTAssertFalse(source.contains("Refresh the Dock when pinned apps change."))
+        XCTAssertFalse(source.contains("Dock app shortcuts"))
+        XCTAssertFalse(source.contains("Add App Shortcut"))
+        XCTAssertFalse(source.contains("No manual shortcuts"))
+    }
+
+    func testFinderRowCarriesItsOwnSwitchAndAlwaysShows() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains("ShortcutListRow(\n                    shortcut: model.finderShortcutTitle,\n                    title: \"Finder\",\n                    isDisabled: !model.isFinderShortcutEnabled,\n                    isOn: $model.isFinderShortcutEnabled\n                )"))
+        XCTAssertTrue(source.contains("var isOn: Binding<Bool>? = nil"))
+        XCTAssertTrue(source.contains(".accessibilityLabel(\"Finder shortcut\")"))
+        XCTAssertFalse(source.contains("Toggle(\"Finder shortcut\", isOn: $model.isFinderShortcutEnabled)"))
+    }
+
+    func testFinderRowDimsOnlyKeycapAndTitleNotSwitch() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+        let rowStart = try XCTUnwrap(source.range(of: "private struct ShortcutListRow: View {"))
+        let rowEnd = try XCTUnwrap(source.range(of: "private struct ManualShortcutRow: View {"))
+        let rowSource = String(source[rowStart.lowerBound..<rowEnd.lowerBound])
+
+        XCTAssertTrue(rowSource.contains("            .opacity(isDisabled ? 0.62 : 1)\n\n            if let isOn {"))
+        XCTAssertFalse(rowSource.contains("        .opacity(isDisabled ? 0.62 : 1)\n    }\n}"))
     }
 }
