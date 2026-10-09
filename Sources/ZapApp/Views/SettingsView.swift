@@ -4,9 +4,16 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 final class SettingsNavigationState: ObservableObject {
-    @Published var selectedMode: SettingsMode
+    @Published var selectedMode: SettingsMode {
+        didSet {
+            defaults.set(selectedMode.rawValue, forKey: SettingsMode.lastModeDefaultsKey)
+        }
+    }
 
-    init(selectedMode: SettingsMode = .automatic) {
+    private let defaults: UserDefaults
+
+    init(selectedMode: SettingsMode = .general, defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         self.selectedMode = selectedMode
     }
 }
@@ -23,7 +30,7 @@ struct SettingsView: View {
         model: ZapAppModel,
         updateService: UpdateService,
         showMenuBarIcon: Binding<Bool>,
-        initialMode: SettingsMode = .automatic,
+        initialMode: SettingsMode = .general,
         navigationState: SettingsNavigationState? = nil
     ) {
         self.model = model
@@ -46,21 +53,19 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: ZapSpacing.large) {
                     switch selectedMode {
-                    case .automatic:
+                    case .general:
+                        generalSection
+                        aboutSection
+                    case .apps:
                         automaticShortcutsSection
                         automaticSection
-                    case .manual:
                         manualSection
-                    case .windowManagement:
+                    case .windows:
                         WindowManagementSettingsView(
                             model: model.windowManagementModel,
                             registrationError: model.registrationError,
                             inputSourceRevision: model.inputSourceRevision
                         )
-                    case .general:
-                        generalSection
-                    case .about:
-                        aboutSection
                     }
                 }
                 .padding(22)
@@ -134,10 +139,7 @@ struct SettingsView: View {
             }
             .padding(.bottom, 12)
 
-            sidebarSection(title: "Shortcuts", modes: [.automatic, .manual, .windowManagement])
-
-            sidebarSection(title: "System", modes: [.general, .about])
-                .padding(.top, 10)
+            sidebarSection(title: "Settings", modes: SettingsMode.allCases)
 
             Spacer()
         }
@@ -416,38 +418,38 @@ struct SettingsView: View {
 
         if panel.runModal() == .OK, let url = panel.url {
             model.addManualShortcut(appURL: url)
-            selectedMode = .manual
+            selectedMode = .apps
         }
     }
 }
 
 enum SettingsMode: String, CaseIterable, Identifiable {
-    case automatic
-    case manual
-    case windowManagement
     case general
-    case about
+    case apps
+    case windows
+
+    static let lastModeDefaultsKey = "settings_last_mode"
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .automatic: "Automatic"
-        case .manual: "Manual"
-        case .windowManagement: "Window Management"
         case .general: "General"
-        case .about: "About"
+        case .apps: "Apps"
+        case .windows: "Windows"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .automatic: "sparkle"
-        case .manual: "keyboard"
-        case .windowManagement: "rectangle.3.group"
         case .general: "gearshape"
-        case .about: "info.circle"
+        case .apps: "square.grid.2x2"
+        case .windows: "rectangle.3.group"
         }
+    }
+
+    static func initial(requested: SettingsMode?, storedRawValue: String?) -> SettingsMode {
+        requested ?? storedRawValue.flatMap(SettingsMode.init(rawValue:)) ?? .general
     }
 }
 

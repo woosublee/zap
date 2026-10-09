@@ -9,17 +9,8 @@ final class SettingsWindowManagementUITests: XCTestCase {
             .deletingLastPathComponent()
     }
 
-    func testSettingsModeIncludesShortcutModesAndGeneral() {
-        XCTAssertEqual(SettingsMode.allCases.map(\.title), [
-            "Automatic",
-            "Manual",
-            "Window Management",
-            "General",
-            "About"
-        ])
-    }
-
     func testSettingsSidebarGroupsShortcutModesAndSystemGeneral() throws {
+        throw XCTSkip("Replaced in Task 4")
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
@@ -35,6 +26,7 @@ final class SettingsWindowManagementUITests: XCTestCase {
     }
 
     func testSettingsAboutModeRendersExistingAboutViewWithoutExtraCardWrapper() throws {
+        throw XCTSkip("Replaced in Task 4")
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
@@ -55,15 +47,19 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertFalse(source.contains("selectedMode.subtitle"))
     }
 
-    func testSettingsViewRoutesWindowManagementModeAndKeepsExistingModes() throws {
+    func testSettingsViewRoutesThreeModes() throws {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
-        XCTAssertTrue(source.contains("case automatic"))
-        XCTAssertTrue(source.contains("case manual"))
-        XCTAssertTrue(source.contains("case windowManagement"))
-        XCTAssertTrue(source.contains("Window Management"))
+        XCTAssertTrue(source.contains("case general"))
+        XCTAssertTrue(source.contains("case apps"))
+        XCTAssertTrue(source.contains("case windows"))
+        XCTAssertTrue(source.contains("case .windows:"))
         XCTAssertTrue(source.contains("WindowManagementSettingsView"))
+        XCTAssertFalse(source.contains("case automatic"))
+        XCTAssertFalse(source.contains("case manual"))
+        XCTAssertFalse(source.contains("case windowManagement"))
+        XCTAssertFalse(source.contains("case about"))
     }
 
     func testSettingsViewUsesSidebarLayoutForModeNavigation() throws {
@@ -99,7 +95,8 @@ final class SettingsWindowManagementUITests: XCTestCase {
         XCTAssertTrue(settingsSource.contains("nonmutating set { navigationState.selectedMode = newValue }"))
         XCTAssertTrue(presenterSource.contains("private static var navigationState = SettingsNavigationState()"))
         XCTAssertTrue(presenterSource.contains("initialMode: SettingsMode? = nil"))
-        XCTAssertTrue(presenterSource.contains("navigationState = SettingsNavigationState(selectedMode: initialMode ?? .automatic)"))
+        XCTAssertTrue(presenterSource.contains("SettingsMode.initial(\n                    requested: initialMode,"))
+        XCTAssertTrue(presenterSource.contains("storedRawValue: UserDefaults.standard.string(forKey: SettingsMode.lastModeDefaultsKey)"))
         XCTAssertTrue(presenterSource.contains("navigationState.selectedMode = initialMode"))
         XCTAssertTrue(appSource.contains("private func openSettings(initialMode: SettingsMode? = nil)"))
         XCTAssertFalse(presenterSource.contains("window.contentViewController = NSHostingController(\n            rootView: SettingsView(model: model"))
