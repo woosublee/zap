@@ -140,13 +140,19 @@ struct SettingsView: View {
             .padding(.bottom, 15)
 
             ForEach(SettingsMode.allCases) { mode in
-                SettingsSidebarItem(
-                    mode: mode,
-                    isSelected: selectedMode == mode,
-                    action: { selectedMode = mode }
-                ) {
-                    if mode == .windows {
-                        AccessibilityWarningBadge(model: model.windowManagementModel)
+                if mode == .windows {
+                    WindowsSidebarItem(
+                        model: model.windowManagementModel,
+                        isSelected: selectedMode == mode
+                    ) {
+                        selectedMode = mode
+                    }
+                } else {
+                    SettingsSidebarItem(
+                        mode: mode,
+                        isSelected: selectedMode == mode
+                    ) {
+                        selectedMode = mode
                     }
                 }
             }
@@ -381,11 +387,11 @@ enum SettingsMode: String, CaseIterable, Identifiable {
     }
 }
 
-private struct SettingsSidebarItem<Accessory: View>: View {
+private struct SettingsSidebarItem: View {
     let mode: SettingsMode
     let isSelected: Bool
+    var warning: String? = nil
     let action: () -> Void
-    @ViewBuilder let accessory: Accessory
 
     var body: some View {
         Button(action: action) {
@@ -397,7 +403,13 @@ private struct SettingsSidebarItem<Accessory: View>: View {
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                accessory
+                if warning != nil {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .help(warning ?? "")
+                        .accessibilityHidden(true)
+                }
             }
             .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
             .padding(.horizontal, 10)
@@ -411,21 +423,28 @@ private struct SettingsSidebarItem<Accessory: View>: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(mode.title)
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityValue: String {
+        [isSelected ? "Selected" : "Not selected", warning]
+            .compactMap { $0 }
+            .joined(separator: ", ")
     }
 }
 
-private struct AccessibilityWarningBadge: View {
+private struct WindowsSidebarItem: View {
     @ObservedObject var model: WindowManagementModel
+    let isSelected: Bool
+    let action: () -> Void
 
     var body: some View {
-        if !model.accessibilityTrusted {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.orange)
-                .help("Accessibility permission required")
-                .accessibilityLabel("Accessibility permission required")
-        }
+        SettingsSidebarItem(
+            mode: .windows,
+            isSelected: isSelected,
+            warning: model.accessibilityTrusted ? nil : "Accessibility permission required",
+            action: action
+        )
     }
 }
 

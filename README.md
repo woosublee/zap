@@ -70,7 +70,7 @@ Window Management moves and resizes the frontmost window with customizable globa
 - larger and smaller resize shortcuts;
 - undo and redo for window layout changes.
 
-Window Management requires macOS Accessibility permission so Zap can move and resize other apps' windows. If permission has not been granted yet, Zap shows the permission state in Settings and locks the window shortcuts until access is available.
+Window Management requires macOS Accessibility permission so Zap can move and resize other apps' windows. If permission has not been granted yet, Zap shows a **Grant…** button on the Windows page and locks the window shortcuts until access is available. Dock and custom app shortcuts work without it.
 
 ### Finder shortcut
 

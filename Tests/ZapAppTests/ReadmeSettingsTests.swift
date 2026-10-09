@@ -29,4 +29,11 @@ final class ReadmeSettingsTests: XCTestCase {
     func testReadmeMenuBarListIncludesAboutZap() throws {
         XCTAssertTrue(try readme.contains("- About Zap;\n- Settings;"))
     }
+
+    func testReadmePermissionTextPointsToWindowsGrantButton() throws {
+        let source = try readme
+
+        XCTAssertFalse(source.contains("Zap shows the permission state in Settings"))
+        XCTAssertTrue(source.contains("Zap shows a **Grant…** button on the Windows page"))
+    }
 }

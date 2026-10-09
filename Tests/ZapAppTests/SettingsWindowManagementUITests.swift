@@ -98,7 +98,7 @@ final class SettingsWindowManagementUITests: XCTestCase {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
-        XCTAssertTrue(source.contains("accessibilityValue(isSelected ? \"Selected\" : \"Not selected\")"))
+        XCTAssertTrue(source.contains("isSelected ? \"Selected\" : \"Not selected\""))
     }
 
     func testSettingsSidebarItemUsesFullRowHitArea() throws {
@@ -129,11 +129,19 @@ final class SettingsWindowManagementUITests: XCTestCase {
         let source = try String(contentsOf: packageRootURL
             .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
 
-        XCTAssertTrue(source.contains("private struct AccessibilityWarningBadge: View {\n    @ObservedObject var model: WindowManagementModel"))
-        XCTAssertTrue(source.contains("if !model.accessibilityTrusted {"))
+        XCTAssertTrue(source.contains("private struct WindowsSidebarItem: View {\n    @ObservedObject var model: WindowManagementModel"))
+        XCTAssertTrue(source.contains("warning: model.accessibilityTrusted ? nil : \"Accessibility permission required\","))
         XCTAssertTrue(source.contains("Image(systemName: \"exclamationmark.circle.fill\")"))
-        XCTAssertTrue(source.contains(".accessibilityLabel(\"Accessibility permission required\")"))
-        XCTAssertTrue(source.contains("if mode == .windows {\n                        AccessibilityWarningBadge(model: model.windowManagementModel)\n                    }"))
+        XCTAssertTrue(source.contains("WindowsSidebarItem(\n                        model: model.windowManagementModel,"))
+        XCTAssertFalse(source.contains("AccessibilityWarningBadge"))
+    }
+
+    func testSidebarWarningIsAnnouncedInAccessibilityValue() throws {
+        let source = try String(contentsOf: packageRootURL
+            .appendingPathComponent("Sources/ZapApp/Views/SettingsView.swift"))
+
+        XCTAssertTrue(source.contains(".accessibilityValue(accessibilityValue)"))
+        XCTAssertTrue(source.contains("[isSelected ? \"Selected\" : \"Not selected\", warning]\n            .compactMap { $0 }\n            .joined(separator: \", \")"))
     }
 
     func testSettingsBodyDoesNotAppendBehaviorAndUpdatesToEveryMode() throws {

@@ -113,7 +113,7 @@ enum AppDistribution {
 - 손쉬운 사용 권한은 창 관리에만 필요하다(전역 단축키 등록과 앱 실행은 권한 없이 동작). 그래서 권한 UI는 General이 아니라 Windows에 둔다.
   - 권한이 없을 때만 카드 맨 위에 권한 행을 표시한다: 자물쇠 아이콘, 제목 `AccessibilityPaneName.current`, 부제 "Required to move and resize windows.", 오른쪽 `Grant…` 버튼(기존과 같은 `requestAccessibilityPermission(sourceFrame: .atMouse)` 후 새로고침).
   - 권한이 있으면 행을 숨긴다(상태 표시 없음).
-  - 권한이 없으면 사이드바 Windows 항목 오른쪽에 주황색 `exclamationmark.circle.fill`을 표시한다. 이 배지는 `WindowManagementModel`을 직접 관찰하는 뷰로 만든다.
+  - 권한이 없으면 사이드바 Windows 항목 오른쪽에 주황색 `exclamationmark.circle.fill`을 표시한다. 이 배지는 `WindowManagementModel`을 직접 관찰하는 뷰로 만든다. VoiceOver에는 Windows 항목의 accessibility value에 "Accessibility permission required"를 덧붙여 알린다(배지 이미지는 `accessibilityHidden`).
 - 카테고리 그룹은 2열 `LazyVGrid`를 버리고 **단일 열 목록**으로 바꾼다. 행 사이는 구분선으로 나누고 행 배경 박스는 제거한다.
 - 카테고리 제목은 caption 크기, 대문자, secondary 색으로 표시한다.
 - `WindowShortcutRowView`는 바꾸지 않는다. keycap을 클릭하면 녹화하고, 체크 아이콘 버튼으로 활성/비활성을 바꾸고, 권한이 없으면 잠긴다. 목업에서 스위치로 그린 부분은 기존 체크 아이콘 버튼을 그대로 쓴다. 이름 텍스트는 `lineLimit(1)`을 유지하되 단일 열이라 잘리지 않아야 한다.
